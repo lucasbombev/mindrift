@@ -1,0 +1,13 @@
+node_modules/
+frontend/dist/
+backend/data/
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/backups/*
+!backend/backups/.gitkeep
+backend/.env
+backend/certs/
+.env
+*.log
+.DS_Store
+coverage/

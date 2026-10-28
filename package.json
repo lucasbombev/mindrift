@@ -1,0 +1,22 @@
+{
+  "name": "drift-rent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SaaS local (LAN) para gestão de aluguel de carrinhos de drift",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "start": "node scripts/start.mjs",
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run build --workspace frontend",
+    "seed": "npm run seed --workspace backend",
+    "test": "npm test --workspace backend",
+    "backup": "npm run backup --workspace backend",
+    "cert": "node scripts/generate-cert.mjs"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

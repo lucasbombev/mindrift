@@ -1,0 +1,34 @@
+import { useNavigate } from 'react-router-dom';
+import { ChangePasswordForm } from '../components/ChangePassword.jsx';
+import { Button, PageHeader } from '../components/ui.jsx';
+import { Icon } from '../components/Icons.jsx';
+
+export function ChangePasswordPage() {
+  const navigate = useNavigate();
+  return (
+    <div className="container container--narrow">
+      <PageHeader
+        title="Alterar senha"
+        subtitle="Use uma senha só sua, com pelo menos 8 caracteres, letras e números."
+        eyebrow="Conta"
+        actions={
+          <Button variant="ghost" icon="arrowLeft" onClick={() => navigate(-1)}>
+            Voltar
+          </Button>
+        }
+      />
+      <div className="card password-card">
+        <div className="password-card__head">
+          <span className="password-card__icon">
+            <Icon name="key" size={22} />
+          </span>
+          <div>
+            <h2>Segurança da conta</h2>
+            <p>Ao trocar a senha, outras sessões abertas em outros aparelhos serão encerradas.</p>
+          </div>
+        </div>
+        <ChangePasswordForm onDone={() => navigate('/')} onCancel={() => navigate(-1)} />
+      </div>
+    </div>
+  );
+}

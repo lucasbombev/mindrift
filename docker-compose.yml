@@ -1,0 +1,41 @@
+services:
+  drift-rent:
+    build: .
+    container_name: drift-rent
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+      - "3443:3443"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      TZ: ${TZ:-America/Fortaleza}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no arquivo .env antes de subir}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Defina JWT_REFRESH_SECRET no arquivo .env antes de subir}
+      DB_PATH: data/drift.db
+      UPLOAD_DIR: uploads
+      BACKUP_DIR: backups
+      ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-12h}
+      REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL:-30d}
+      BACKUP_HOUR: ${BACKUP_HOUR:-3}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      HTTPS_PORT: 3443
+      TRUST_PROXY: "0"
+    volumes:
+      - ./backend/data:/app/backend/data
+      - ./backend/uploads:/app/backend/uploads
+      - ./backend/backups:/app/backend/backups
+      - ./backend/certs:/app/backend/certs:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 6s
+      retries: 3
+      start_period: 20s

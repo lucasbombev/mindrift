@@ -1,0 +1,14 @@
+node_modules
+frontend/dist
+backend/data
+backend/uploads
+backend/backups
+backend/certs
+backend/.env
+.env
+.git
+*.log
+ui-check.mjs
+ui-advanced.mjs
+ui-advanced2.mjs
+debug-renew.mjs
