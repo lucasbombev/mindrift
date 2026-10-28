@@ -431,6 +431,10 @@ export function SettingsPage() {
             </div>
           </div>
           <p className="muted small">
+            Para HTTPS confiável no celular via Tailscale, rode no notebook:{' '}
+            <code>tailscale serve --bg 3000</code> (veja o README).
+          </p>
+          <p className="muted small">
             Banco em <code>{system?.dbPath}</code>
           </p>
         </section>

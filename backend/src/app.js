@@ -144,7 +144,11 @@ export function createApp({ db }) {
         index: false,
         maxAge: '1h',
         setHeaders(res, filePath) {
-          if (filePath.endsWith('sw.js') || filePath.endsWith('.webmanifest')) {
+          if (
+            filePath.endsWith('sw.js') ||
+            filePath.endsWith('registerSW.js') ||
+            filePath.endsWith('.webmanifest')
+          ) {
             res.setHeader('Cache-Control', 'no-cache');
           } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');

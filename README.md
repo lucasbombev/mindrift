@@ -5,7 +5,8 @@ na pista roda o **servidor + banco**; operadores e o dono usam **celulares pelo 
 ou PWA**, na mesma rede Wi-Fi. Não precisa de internet, CDN, conta em nuvem ou chave de API.
 
 - **Backend:** Node.js + Express + SQLite (`better-sqlite3`) + Socket.IO
-- **Frontend:** React + Vite, mobile-first, instalável (PWA)
+- **Frontend:** React + Vite, mobile-first, PWA via `vite-plugin-pwa`, instalável por HTTPS
+- **Acesso externo:** HTTPS confiável do Tailscale (`tailscale serve`)
 - **Tempo real:** timer autoritativo no servidor, sincronizado por WebSocket
 - **Autenticação:** JWT + refresh cookie + **bcrypt** (`bcryptjs`) + rate-limit
 - **Fotos:** upload no disco em `backend/uploads`, servidas por `/uploads`
@@ -43,7 +44,7 @@ Fuso:    America/Fortaleza
 Banco:   .../backend/data/drift.db
 Backup:  .../backend/backups
 
-Primeiro acesso: admin / admin123
+Primeiro acesso: admin / admin123 / Lucas$99
 A troca de senha será exigida no login.
 ```
 
@@ -89,51 +90,97 @@ New-NetFirewallRule -DisplayName "Drift Rent" -Direction Inbound -Protocol TCP -
 
 ---
 
-## 2. PWA no celular (importante)
+## 2. PWA no celular via HTTPS do Tailscale
 
-Navegadores só habilitam **service worker / instalação completa de PWA** em
-**HTTPS** (ou `localhost`). Em `http://192.168.x.x:3000`, o Android/iOS consegue criar um
-**atalho** na tela inicial, mas o app completo/offline não é habilitado pelo navegador.
+O PWA precisa de **HTTPS confiável** para registrar o service worker e permitir
+“Instalar aplicativo” no Chrome ou “Adicionar à Tela de Início” no Safari. A forma
+recomendada neste projeto é o **HTTPS do Tailscale**, que já usa um certificado público
+válido e não exige instalar CA no celular.
 
-Há dois caminhos:
+Pré-requisitos: Tailscale instalado e conectado no **notebook** e no **celular**, ambos na
+mesma tailnet. O notebook pode continuar servindo a LAN em HTTP normalmente.
 
-### A) No notebook (localhost) — já funciona
+No notebook, com o sistema rodando (`npm start`):
 
-Abra `http://localhost:3000` e use o ícone de instalação do Chrome/Edge.
+```bash
+# se der "Access denied", habilite seu usuário como operador do Tailscale (uma vez):
+sudo tailscale set --operator=$USER
 
-### B) No celular via HTTPS local — recomendado para o PWA
+tailscale serve --bg 3000
+tailscale serve status
+```
 
-Gere uma CA e um certificado local (o IP atual do notebook entra no certificado):
+> Alternativa: `sudo tailscale serve --bg 3000`. O serviço do Tailscale roda como root;
+> por isso a publicação exige essa permissão. Depois de `set --operator`, os próximos
+> comandos não precisam mais de `sudo`.
+
+O comando publica o app em algo como:
+
+```
+https://lucas-pc.tailf257d9.ts.net
+```
+
+Abra essa URL no celular (com o Tailscale conectado). O certificado é válido e o PWA
+funciona em tela cheia. Para desfazer a publicação:
+
+```bash
+tailscale serve reset
+```
+
+> Se o `tailscale serve` informar que HTTPS está desabilitado, ative
+> **HTTPS Certificates** no painel de administração do Tailscale (DNS) e tente novamente.
+> O Tailscale precisa de internet; o modo LAN puro continua funcionando sem ele.
+
+### Instalar o PWA
+
+**Android (Chrome):** abra a URL HTTPS, toque no menu **⋮** e escolha
+**Instalar aplicativo** (ou “Adicionar à tela inicial”).
+
+**iPhone/iPad (Safari):** abra a URL HTTPS, toque em **Compartilhar** e escolha
+**Adicionar à Tela de Início**.
+
+O ícone instalado abre em modo standalone, com o nome **Drift** / **Carrinhos de Drift**.
+O service worker gerado pelo `vite-plugin-pwa` mantém o shell do app em cache; as chamadas
+`/api/*` são **NetworkOnly** e nunca vêm do cache, garantindo timer e status sempre do
+servidor local. O Socket.IO/WebSocket não é cacheado.
+
+O build de produção (`npm run build`) gera em `frontend/dist/`:
+
+- `manifest.webmanifest` (nome, ícones e modo standalone);
+- `sw.js` (Workbox com precache, navegação SPA e runtime caching);
+- `registerSW.js` (registro gerado pelo plugin).
+
+Quando há uma nova versão, o app mostra o banner **“Nova versão disponível — atualizar”** e
+recarrega somente quando você toca em **Atualizar**.
+
+### Alternativa: LAN com HTTPS local (sem Tailscale)
+
+Também é possível gerar um certificado local. Se o IP do notebook mudar, use
+`npm run cert -- --force` (reaproveita a CA já confiável) e reinicie:
 
 ```bash
 npm run cert
 npm start
 ```
 
-O servidor passa a atender também **`https://IP-DO-NOTEBOOK:3443`**. O terminal mostra o
-endereço. **Se o IP do notebook mudar, rode `npm run cert -- --force` e reinicie** para o
-certificado cobrir o novo endereço. Isso reutiliza a mesma CA (não é preciso reinstalar a
-confiança nos celulares). Use `--new-ca` apenas se quiser criar uma CA nova. Para o navegador confiar no certificado:
+O app atende em **`https://IP-DO-NOTEBOOK:3443`**. Para o navegador confiar:
 
-1. Baixe `backend/certs/local-ca.crt` para o celular — pelo painel em
-   **Ajustes → Rede local → baixar certificado local** (`/local-ca.crt`), por cabo ou AirDrop.
+1. Baixe `backend/certs/local-ca.crt` pelo painel em **Ajustes → Rede local → baixar
+   certificado local**.
 2. **Android:** Ajustes → Segurança → Criptografia e credenciais → Instalar certificado →
-   Certificado de CA → selecione `local-ca.crt`. Dê um nome (“Drift Rent”).
-3. **iPhone/iPad:** envie o arquivo, instale o perfil em Ajustes → Geral → VPN e
-   Gerenciamento de Dispositivos e depois ative em Ajustes → Geral → Sobre → Ajustes de
-   Confiança de Certificado.
-4. Abra `https://IP:3443`, faça login.
-5. **Android/Chrome:** menu ⋮ → **Instalar app**.
-   **iPhone/Safari:** Compartilhar → **Adicionar à Tela de Início**.
-6. O app abre em tela cheia (standalone) e registra o service worker.
+   Certificado de CA → selecione o arquivo.
+3. **iPhone/iPad:** instale o perfil em Ajustes → Geral → VPN e Gerenciamento de
+   Dispositivos e ative a confiança em Ajustes → Geral → Sobre → Ajustes de Confiança de
+   Certificado.
+4. Abra `https://IP:3443`, faça login e instale o PWA.
 
-> Se não puder instalar a CA, é possível abrir o HTTPS e aceitar o aviso do navegador,
-> mas o PWA/service worker pode continuar bloqueado. Em último caso, use o HTTP com
-> “Adicionar à tela inicial” (atalho) — todas as funções continuam funcionando, desde que
-> o servidor esteja acessível na LAN.
+> Em `http://IP:3000` (sem HTTPS), o celular cria apenas um atalho; o service worker e a
+> instalação completa ficam bloqueados pela política do navegador. Para uso na LAN sem
+> Tailscale, prefira a opção HTTPS local acima.
 
-O Wi-Fi não precisa ter internet; ele só precisa conectar os celulares ao notebook.
-Não há nenhuma requisição a CDNs: fontes são do sistema e ícones são SVG locais.
+No modo LAN puro, o Wi-Fi não precisa ter internet; ele só precisa conectar os celulares
+ao notebook. Para o HTTPS via Tailscale, o notebook precisa de internet para o túnel.
+Não há requisições a CDNs: fontes são do sistema e ícones são SVG locais.
 
 ---
 
@@ -523,8 +570,8 @@ O upload precisa de JPG/PNG/WebP válido. A imagem é reduzida para até 1280 px
 `backend/uploads` existe e tem permissão de escrita.
 
 **PWA não instala**
-Use HTTPS com certificado confiável (seção 2) ou `localhost` no notebook. Em HTTP puro o
-navegador cria apenas um atalho. O botão **Instalar app** mostra instruções no aparelho.
+Use o HTTPS do Tailscale (recomendado), o HTTPS local da seção 2 ou `localhost` no notebook.
+Em HTTP puro o navegador cria apenas um atalho. O botão **Instalar aplicativo** mostra instruções no aparelho.
 
 **Alarme não toca**
 Toque em “Ativar som” uma vez após abrir o painel; mantenha o app aberto. Verifique o volume

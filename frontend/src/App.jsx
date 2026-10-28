@@ -14,6 +14,7 @@ import { UsersPage } from './pages/UsersPage.jsx';
 import { CashPage } from './pages/CashPage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { ChangePasswordPage } from './pages/ChangePasswordPage.jsx';
+import { PwaUpdateBanner } from './components/PwaUpdateBanner.jsx';
 
 function AdminOnly({ children }) {
   const { isAdmin } = useAuth();
@@ -140,5 +141,10 @@ function AppRoutes() {
 }
 
 export default function App() {
-  return <AppRoutes />;
+  return (
+    <>
+      <AppRoutes />
+      <PwaUpdateBanner />
+    </>
+  );
 }

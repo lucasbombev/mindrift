@@ -54,9 +54,9 @@ export function InstallInstructionsModal({ open, onClose }) {
       {!context.secure && (
         <InfoNote tone="warning" icon="alert">
           <strong>Conexão HTTP detectada.</strong> O navegador só permite instalação/PWA completo em HTTPS
-          (ou localhost). Use o endereço <strong>https://…:3443</strong> após gerar e confiar no
-          certificado local — instruções no README. No HTTP, use “Adicionar à tela inicial”, que cria um
-          atalho.
+          (ou localhost). Use o endereço <strong>HTTPS do Tailscale</strong> (recomendado) ou
+          <strong> https://…:3443</strong> com o certificado local — instruções no README. No HTTP
+          simples, use “Adicionar à tela inicial”, que cria apenas um atalho.
         </InfoNote>
       )}
       <div className="install-steps">
@@ -64,7 +64,7 @@ export function InstallInstructionsModal({ open, onClose }) {
           <span className="install-step__badge">Android</span>
           <p>
             Abra no <strong>Chrome</strong>, toque no menu <strong>⋮</strong> e escolha{' '}
-            <strong>Instalar app</strong> (ou “Adicionar à tela inicial”).
+            <strong>Instalar aplicativo</strong> (ou “Adicionar à tela inicial”).
           </p>
         </div>
         <div className="install-step">
@@ -78,7 +78,7 @@ export function InstallInstructionsModal({ open, onClose }) {
           <span className="install-step__badge">Notebook</span>
           <p>
             No Chrome/Edge, use o ícone de instalação na barra de endereço ou o menu{' '}
-            <strong>Instalar Drift Rent</strong>.
+            <strong>Instalar aplicativo</strong>.
           </p>
         </div>
       </div>

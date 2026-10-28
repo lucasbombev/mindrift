@@ -100,7 +100,7 @@ function frontendNeedsBuild() {
     latestMtime(path.join(FRONTEND, 'src')),
     latestMtime(path.join(FRONTEND, 'public')),
     fs.statSync(path.join(FRONTEND, 'index.html')).mtimeMs,
-    fs.statSync(path.join(FRONTEND, 'vite.config.js')).mtimeMs,
+    fs.statSync(path.join(FRONTEND, 'vite.config.ts')).mtimeMs,
     fs.statSync(path.join(FRONTEND, 'package.json')).mtimeMs,
   );
   return sourceTime > buildTime + 500;
