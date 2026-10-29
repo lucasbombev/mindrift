@@ -3,6 +3,7 @@ import { api } from '../lib/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatDateTime, initials, roleLabel } from '../lib/format.js';
+import { formatPhoneDisplay, formatPhoneInput, phoneIsValid } from '../lib/phone.js';
 import {
   Avatar,
   Badge,
@@ -26,6 +27,7 @@ function UserModal({ user, onClose, onSaved }) {
   const [nome, setNome] = useState(user?.nome || '');
   const [username, setUsername] = useState(user?.username || '');
   const [email, setEmail] = useState(user?.email || '');
+  const [telefone, setTelefone] = useState(user?.telefone ? formatPhoneDisplay(user.telefone) : '');
   const [role, setRole] = useState(user?.role || 'operador');
   const [ativo, setAtivo] = useState(user?.ativo ?? true);
   const [senha, setSenha] = useState('');
@@ -40,6 +42,7 @@ function UserModal({ user, onClose, onSaved }) {
     setError('');
     if (nome.trim().length < 2) return setError('Informe o nome completo.');
     if (username.trim().length < 3) return setError('Informe um usuário com pelo menos 3 caracteres.');
+    if (telefone && !phoneIsValid(telefone)) return setError('Telefone inválido. Use (DD) 9XXXX-XXXX.');
     if (!isEdit && senha.length < 8) return setError('A senha inicial deve ter pelo menos 8 caracteres.');
     if (senha && (senha.length < 8 || !/[a-zA-Z]/.test(senha) || !/[0-9]/.test(senha))) {
       return setError('A senha deve ter pelo menos 8 caracteres, com letras e números.');
@@ -50,6 +53,7 @@ function UserModal({ user, onClose, onSaved }) {
         nome: nome.trim(),
         username: username.trim(),
         email: email.trim() || null,
+        telefone: telefone || null,
         role,
         ativo,
       };
@@ -126,6 +130,17 @@ function UserModal({ user, onClose, onSaved }) {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             maxLength={120}
+            disabled={loading}
+          />
+        </Field>
+        <Field label="Telefone" htmlFor="user-telefone" hint="Opcional para operador.">
+          <Input
+            id="user-telefone"
+            type="tel"
+            inputMode="tel"
+            value={telefone}
+            onChange={(event) => setTelefone(formatPhoneInput(event.target.value))}
+            maxLength={16}
             disabled={loading}
           />
         </Field>
@@ -273,6 +288,7 @@ export function UsersPage() {
                       : 'Ainda não acessou'}
                     {user.mustChangePassword ? ' · troca de senha pendente' : ''}
                     {user.email ? ` · ${user.email}` : ''}
+                    {user.telefone ? ` · ${formatPhoneDisplay(user.telefone)}` : ''}
                   </span>
                 </div>
                 <div className="user-row__actions">

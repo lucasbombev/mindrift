@@ -32,6 +32,11 @@ export function getDashboard(db, tenantId) {
   const { start, end } = dayBounds();
   const nomeEstabelecimento = getSetting(db, tenantId, 'nome_estabelecimento', 'Drift Rent');
   const alertLeadSeconds = Number(getSetting(db, tenantId, 'alert_lead_seconds', '60')) || 0;
+  const somFim = getSetting(db, tenantId, 'som_fim', 'alarme');
+  const somRepetir = getSetting(db, tenantId, 'som_repetir', '1') === '1';
+  const globalBanner = db
+    .prepare('SELECT mensagem, tipo FROM global_announcements WHERE id = 1 AND ativo = 1')
+    .get();
 
   const categories = db
     .prepare('SELECT * FROM categories WHERE tenant_id = ? ORDER BY nome COLLATE NOCASE')
@@ -157,6 +162,9 @@ export function getDashboard(db, tenantId) {
     serverNow: now.toISOString(),
     nomeEstabelecimento,
     alertLeadSeconds,
+    somFim,
+    somRepetir,
+    globalBanner: globalBanner ? { mensagem: globalBanner.mensagem, tipo: globalBanner.tipo } : null,
     categories,
     summary: {
       totalCarrinhos: carts.length,

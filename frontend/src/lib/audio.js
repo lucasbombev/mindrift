@@ -1,6 +1,18 @@
 let ctx = null;
 let primed = false;
 const listeners = new Set();
+const buffers = new Map();
+const loading = new Map();
+
+export const SOUND_OPTIONS = [
+  { value: 'beep', label: 'Beep' },
+  { value: 'sino', label: 'Sino' },
+  { value: 'alarme', label: 'Alarme' },
+  { value: 'bipe-duplo', label: 'Bipe duplo' },
+  { value: 'apito', label: 'Apito' },
+  { value: 'campainha', label: 'Campainha' },
+];
+export const SOUND_NAMES = SOUND_OPTIONS.map((item) => item.value);
 
 function ensureContext() {
   const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -47,33 +59,55 @@ export function subscribeAudio(listener) {
   return () => listeners.delete(listener);
 }
 
-function tone(frequency, startOffset, duration, volume = 0.18, type = 'sine') {
+async function loadBuffer(name) {
+  if (buffers.has(name)) return buffers.get(name);
+  if (loading.has(name)) return loading.get(name);
+  const task = (async () => {
+    const audio = ensureContext();
+    const res = await fetch(`/sounds/${name}.wav`, { cache: 'force-cache' });
+    if (!res.ok) throw new Error('Som não encontrado.');
+    const bytes = await res.arrayBuffer();
+    const buffer = await audio.decodeAudioData(bytes);
+    buffers.set(name, buffer);
+    return buffer;
+  })();
+  loading.set(name, task);
+  try {
+    return await task;
+  } finally {
+    loading.delete(name);
+  }
+}
+
+export async function preloadSounds() {
+  await Promise.all(SOUND_NAMES.map((name) => loadBuffer(name).catch(() => null)));
+}
+
+/**
+ * Toca um som local usando Web Audio. volume em 0..100.
+ * Retorna true se conseguiu iniciar.
+ */
+export async function playSound(name, { volume = 70 } = {}) {
+  const safeName = SOUND_NAMES.includes(name) ? name : 'beep';
   const audio = ensureContext();
-  if (!audio) return;
-  if (audio.state === 'suspended') audio.resume().catch(() => {});
-  const start = audio.currentTime + startOffset;
-  const osc = audio.createOscillator();
-  const gain = audio.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(frequency, start);
-  gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(volume, start + 0.015);
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-  osc.connect(gain);
-  gain.connect(audio.destination);
-  osc.start(start);
-  osc.stop(start + duration + 0.03);
-}
-
-export function playLeadAlert() {
-  tone(880, 0, 0.12, 0.2, 'triangle');
-  tone(1175, 0.16, 0.16, 0.2, 'triangle');
-}
-
-export function playEndAlarm() {
-  [0, 0.28, 0.56, 1.1, 1.38, 1.66].forEach((offset, index) => {
-    tone(index % 2 === 0 ? 1046 : 784, offset, 0.18, 0.25, 'square');
-  });
+  if (!audio) return false;
+  try {
+    if (audio.state === 'suspended') await audio.resume();
+    primed = audio.state === 'running';
+    listeners.forEach((fn) => fn(primed));
+    if (!primed) return false;
+    const buffer = await loadBuffer(safeName);
+    const source = audio.createBufferSource();
+    const gain = audio.createGain();
+    source.buffer = buffer;
+    gain.gain.value = Math.max(0, Math.min(100, Number(volume) || 0)) / 100 * 0.9;
+    source.connect(gain);
+    gain.connect(audio.destination);
+    source.start();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function vibrate(pattern) {
@@ -84,12 +118,20 @@ export function vibrate(pattern) {
   }
 }
 
+export function playLeadAlert() {
+  playSound('beep', { volume: 70 });
+}
+
+export function playEndAlarm(name = 'alarme', volume = 80) {
+  playSound(name, { volume });
+}
+
 export function alertFeedback(stage) {
   if (stage === 'lead') {
-    playLeadAlert();
+    playSound('beep', { volume: 70 });
     vibrate([160, 90, 160]);
   } else {
-    playEndAlarm();
+    playSound('alarme', { volume: 85 });
     vibrate([500, 160, 500, 160, 500]);
   }
 }

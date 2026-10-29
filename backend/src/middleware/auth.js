@@ -26,11 +26,39 @@ export function authenticateToken(db, token) {
     throw unauthorized('Sessão encerrada. Entre novamente.');
   }
   if (row.role !== 'superadmin') {
-    if (!row.tenant_id || !row.tenant_ativo) {
-      throw forbidden('Negócio inativo ou indisponível.', 'negocio_inativo');
+    if (!row.tenant_id || row.tenant_excluido_em) {
+      throw forbidden('Negócio indisponível. Fale com o suporte.', 'negocio_indisponivel');
+    }
+    if (!row.tenant_ativo) {
+      throw forbidden('Este negócio está suspenso. Fale com o suporte.', 'negocio_suspenso');
     }
   }
-  return publicUser(row);
+  const user = publicUser(row);
+  if (payload.imp) {
+    const audit = db
+      .prepare(
+        `SELECT a.*, s.ativo AS superadmin_ativo, s.role AS superadmin_role
+         FROM audit_logs a JOIN users s ON s.id = a.superadmin_id
+         WHERE a.id = ? AND a.finalizado_em IS NULL`,
+      )
+      .get(Number(payload.imp));
+    if (
+      !audit ||
+      audit.superadmin_role !== 'superadmin' ||
+      !audit.superadmin_ativo ||
+      Number(audit.superadmin_id) !== Number(payload.by) ||
+      Number(audit.tenant_id) !== Number(row.tenant_id)
+    ) {
+      throw unauthorized('Sessão de suporte encerrada. Entre novamente.');
+    }
+    user.impersonation = {
+      id: audit.id,
+      superadminId: audit.superadmin_id,
+      motivo: audit.motivo,
+      iniciadoEm: audit.iniciado_em,
+    };
+  }
+  return user;
 }
 
 export function requireAuth(db) {

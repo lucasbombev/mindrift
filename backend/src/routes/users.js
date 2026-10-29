@@ -5,6 +5,7 @@ import { hashPassword, publicUser } from '../services/auth.js';
 import { badRequest, conflict, notFound } from '../utils/errors.js';
 import { nowIso } from '../utils/time.js';
 import { validateNewPassword } from './auth.js';
+import { normalizePhoneBR } from '../utils/phone.js';
 
 const usernameSchema = z
   .string()
@@ -17,6 +18,7 @@ const createSchema = z.object({
   nome: z.string().trim().min(2, 'Informe o nome.').max(80),
   username: usernameSchema,
   email: z.string().trim().email('E-mail inválido.').max(120).optional().or(z.literal('')),
+  telefone: z.string().trim().max(30).optional().or(z.literal('')),
   senha: z.string().min(8, 'A senha deve ter pelo menos 8 caracteres.').max(72),
   role: z.enum(['admin', 'operador']),
 });
@@ -25,6 +27,7 @@ const updateSchema = z.object({
   nome: z.string().trim().min(2, 'Informe o nome.').max(80).optional(),
   username: usernameSchema.optional(),
   email: z.string().trim().email('E-mail inválido.').max(120).nullable().optional().or(z.literal('')),
+  telefone: z.string().trim().max(30).nullable().optional().or(z.literal('')),
   senha: z.string().min(8, 'A senha deve ter pelo menos 8 caracteres.').max(72).optional(),
   role: z.enum(['admin', 'operador']).optional(),
   ativo: z.boolean().optional(),
@@ -78,19 +81,21 @@ export function createUsersRouter(db) {
         .get(body.username);
       if (exists) throw conflict('Este nome de usuário já está em uso.');
       if (body.email) assertEmailFree(db, body.email.toLowerCase());
+      const telefone = normalizePhoneBR(body.telefone || null);
       const hash = await hashPassword(body.senha);
       const now = nowIso();
       const info = db
         .prepare(
-          `INSERT INTO users (tenant_id, nome, username, email, senha_hash, role, ativo,
+          `INSERT INTO users (tenant_id, nome, username, email, telefone, senha_hash, role, ativo,
              must_change_password, token_version, criado_em, atualizado_em)
-           VALUES (?, ?, ?, ?, ?, ?, 1, 1, 1, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, 1, ?, ?)`,
         )
         .run(
           req.tenantId,
           body.nome,
           body.username,
           body.email ? body.email.toLowerCase() : null,
+          telefone,
           hash,
           body.role,
           now,
@@ -140,6 +145,9 @@ export function createUsersRouter(db) {
       if (body.username !== undefined) push('username = ?', body.username);
       if (body.email !== undefined) {
         push('email = ?', body.email ? String(body.email).toLowerCase() : null);
+      }
+      if (body.telefone !== undefined) {
+        push('telefone = ?', normalizePhoneBR(body.telefone || null));
       }
       if (body.role !== undefined) push('role = ?', body.role);
       if (body.ativo !== undefined) push('ativo = ?', body.ativo ? 1 : 0);

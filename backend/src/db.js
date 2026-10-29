@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS tenants (
   nome TEXT NOT NULL,
   slug TEXT NOT NULL,
   ativo INTEGER NOT NULL DEFAULT 1,
+  excluido_em TEXT,
   criado_em TEXT NOT NULL
 );
 
@@ -44,6 +45,7 @@ CREATE TABLE IF NOT EXISTS users (
   nome TEXT NOT NULL,
   username TEXT NOT NULL COLLATE NOCASE,
   email TEXT,
+  telefone TEXT,
   senha_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('superadmin', 'admin', 'operador')),
   ativo INTEGER NOT NULL DEFAULT 1,
@@ -150,6 +152,49 @@ CREATE TABLE IF NOT EXISTS cash_closures (
   UNIQUE (tenant_id, data)
 );
 
+
+CREATE TABLE IF NOT EXISTS cart_status_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+  cart_id INTEGER NOT NULL REFERENCES carts(id) ON DELETE CASCADE,
+  de TEXT NOT NULL CHECK (de IN ('disponivel', 'em_uso', 'carregando', 'manutencao')),
+  para TEXT NOT NULL CHECK (para IN ('disponivel', 'em_uso', 'carregando', 'manutencao')),
+  motivo TEXT,
+  observacao TEXT,
+  usuario_id INTEGER NOT NULL REFERENCES users(id),
+  criado_em TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+  superadmin_id INTEGER NOT NULL REFERENCES users(id),
+  admin_id INTEGER REFERENCES users(id),
+  motivo TEXT NOT NULL,
+  iniciado_em TEXT NOT NULL,
+  finalizado_em TEXT,
+  ip TEXT,
+  user_agent TEXT
+);
+
+CREATE TABLE IF NOT EXISTS user_sound_preferences (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  som_nome TEXT,
+  volume INTEGER NOT NULL DEFAULT 70 CHECK (volume >= 0 AND volume <= 100),
+  vibrar INTEGER NOT NULL DEFAULT 1,
+  atualizado_em TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS global_announcements (
+  id INTEGER PRIMARY KEY,
+  mensagem TEXT NOT NULL,
+  tipo TEXT NOT NULL DEFAULT 'info' CHECK (tipo IN ('info', 'warning', 'success')),
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_por INTEGER REFERENCES users(id),
+  criado_em TEXT NOT NULL,
+  atualizado_em TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version INTEGER PRIMARY KEY,
   applied_at TEXT NOT NULL
@@ -186,6 +231,13 @@ CREATE INDEX IF NOT EXISTS idx_sessions_adiantado_em ON sessions(adiantado_em);
 
 CREATE INDEX IF NOT EXISTS idx_session_events_tenant ON session_events(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_session_events_session ON session_events(session_id, criado_em);
+
+
+CREATE INDEX IF NOT EXISTS idx_tenants_excluido ON tenants(excluido_em);
+CREATE INDEX IF NOT EXISTS idx_cart_status_events_tenant ON cart_status_events(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_cart_status_events_cart ON cart_status_events(cart_id, criado_em);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant ON audit_logs(tenant_id, iniciado_em);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_superadmin ON audit_logs(superadmin_id, iniciado_em);
 
 CREATE INDEX IF NOT EXISTS idx_cash_closures_tenant ON cash_closures(tenant_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_cash_closures_tenant_data
@@ -356,6 +408,29 @@ function migrateLegacy(db) {
   console.log('[migração] Multi-tenant aplicado com sucesso.');
 }
 
+
+/**
+ * v4 — superadmin/sistema, telefone, som e histórico de status.
+ * Colunas são adicionadas sem reconstruir tabelas; as novas tabelas vêm de SCHEMA_TABLES.
+ */
+function migrateV4(db, { makeBackup = true } = {}) {
+  const tenantCols = tableColumns(db, 'tenants');
+  const userCols = tableColumns(db, 'users');
+  const needsColumns = !tenantCols.has('excluido_em') || !userCols.has('telefone');
+  if (makeBackup && needsColumns && tableExists(db, 'users')) createMigrationBackup(db);
+
+  if (!tenantCols.has('excluido_em')) db.exec('ALTER TABLE tenants ADD COLUMN excluido_em TEXT');
+  if (!userCols.has('telefone')) db.exec('ALTER TABLE users ADD COLUMN telefone TEXT');
+
+  db.exec(SCHEMA_TABLES);
+  db.exec(SCHEMA_INDEXES);
+  for (const tenant of db.prepare('SELECT id, nome FROM tenants').all()) {
+    seedTenantSettings(db, tenant.id, tenant.nome);
+  }
+  db.prepare('INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (4, ?)').run(nowIso());
+  db.pragma('user_version = 4');
+}
+
 export function ensureDefaultTenant(db) {
   let tenant = db.prepare("SELECT * FROM tenants WHERE slug = 'default'").get();
   if (!tenant) {
@@ -385,15 +460,12 @@ export function openDb(filePath = config.dbPath) {
 
   if (!legacy) {
     db.exec(SCHEMA_TABLES);
-    db.exec(SCHEMA_INDEXES);
+    migrateV4(db, { makeBackup: usersExist });
     ensureDefaultTenant(db);
-    db.pragma('user_version = 3');
   } else {
     migrateLegacy(db);
-    // Garante que a tabela de controle exista e que o tenant default esteja completo.
-    db.prepare('INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (3, ?)').run(nowIso());
     ensureDefaultTenant(db);
-    db.pragma('user_version = 3');
+    migrateV4(db, { makeBackup: false });
   }
 
   return db;

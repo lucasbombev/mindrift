@@ -5,6 +5,7 @@ import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { SocketProvider } from './context/SocketContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
+import { SoundProvider } from './context/SoundContext.jsx';
 import { primeAudio } from './lib/audio.js';
 import { registerSW } from 'virtual:pwa-register';
 import './styles.css';
@@ -16,9 +17,11 @@ root.render(
     <BrowserRouter>
       <ToastProvider>
         <AuthProvider>
-          <SocketProvider>
-            <App />
-          </SocketProvider>
+          <SoundProvider>
+            <SocketProvider>
+              <App />
+            </SocketProvider>
+          </SoundProvider>
         </AuthProvider>
       </ToastProvider>
     </BrowserRouter>

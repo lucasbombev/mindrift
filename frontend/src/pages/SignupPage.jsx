@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Button, Field, InlineError, InfoNote, Input } from '../components/ui.jsx';
 import { Icon, Logo } from '../components/Icons.jsx';
+import { formatPhoneInput, phoneIsValid } from '../lib/phone.js';
 
 export function SignupPage() {
   const { signup } = useAuth();
@@ -11,6 +12,7 @@ export function SignupPage() {
     nome: '',
     adminNome: '',
     email: '',
+    telefone: '',
     senha: '',
     confirmar: '',
   });
@@ -25,6 +27,7 @@ export function SignupPage() {
     if (form.nome.trim().length < 2) return setError('Informe o nome do negócio.');
     if (form.adminNome.trim().length < 2) return setError('Informe o nome do administrador.');
     if (!form.email.includes('@')) return setError('Informe um e-mail válido.');
+    if (!phoneIsValid(form.telefone)) return setError('Informe o telefone com DDD no formato (DD) 9XXXX-XXXX.');
     if (form.senha.length < 8) return setError('A senha deve ter pelo menos 8 caracteres.');
     if (!/[a-zA-Z]/.test(form.senha) || !/[0-9]/.test(form.senha)) {
       return setError('A senha precisa ter letras e números.');
@@ -36,6 +39,7 @@ export function SignupPage() {
         nome: form.nome.trim(),
         adminNome: form.adminNome.trim(),
         email: form.email.trim(),
+        telefone: form.telefone,
         senha: form.senha,
       });
       navigate('/', { replace: true });
@@ -90,6 +94,9 @@ export function SignupPage() {
             </Field>
             <Field label="E-mail" htmlFor="signup-email" required hint="Você usará este e-mail para entrar.">
               <Input id="signup-email" type="email" value={form.email} onChange={set('email')} maxLength={120} autoComplete="email" autoCapitalize="none" disabled={loading} />
+            </Field>
+            <Field label="Telefone do admin" htmlFor="signup-telefone" required hint="Formato (DD) 9XXXX-XXXX.">
+              <Input id="signup-telefone" type="tel" inputMode="tel" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: formatPhoneInput(e.target.value) })} maxLength={16} autoComplete="tel" disabled={loading} />
             </Field>
             <div className="form-grid form-grid--2">
               <Field label="Senha" htmlFor="signup-senha" required hint="8+ caracteres, com letras e números.">

@@ -62,7 +62,7 @@ function statusClass(status) {
   );
 }
 
-export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd, isAdmin }) {
+export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd, onStatusChange, isAdmin }) {
   const session = cart.sessaoAtiva;
   const endsAt = session ? new Date(session.fimPrevistoEm).getTime() : 0;
   const remaining = session ? endsAt - now : null;
@@ -110,6 +110,18 @@ export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd,
       </div>
 
       <div className="cart-card__body">
+        <div className="cart-card__top-actions">
+          <button
+            type="button"
+            className="cart-menu-btn"
+            aria-label={session ? 'Encerre a sessão primeiro' : `Alterar status de ${cart.codigo}`}
+            title={session ? 'Encerre a sessão primeiro' : 'Alterar status'}
+            disabled={Boolean(session) || cart.status === 'em_uso'}
+            onClick={() => onStatusChange?.(cart)}
+          >
+            <Icon name="more" size={20} />
+          </button>
+        </div>
         {session ? (
           <>
             <div className="cart-card__session-head">
@@ -182,6 +194,7 @@ export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd,
                 Encerrar
               </Button>
             </div>
+            <p className="cart-card__status-note">Para mudar o status, encerre a sessão primeiro.</p>
           </>
         ) : cart.status === 'disponivel' ? (
           <>

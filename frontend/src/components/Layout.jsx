@@ -5,9 +5,11 @@ import { useSocket } from '../context/SocketContext.jsx';
 import { Avatar, Button, IconButton, Modal } from '../components/ui.jsx';
 import { Icon, Logo } from '../components/Icons.jsx';
 import { InstallAppButton, InstallInstructionsModal } from '../components/InstallApp.jsx';
+import { SoundSettingsModal } from './SoundSettings.jsx';
 import { useInstallState } from '../hooks/useInstallState.js';
 import { promptInstall } from '../lib/pwa.js';
 import { roleLabel } from '../lib/format.js';
+import { formatPhoneDisplay } from '../lib/phone.js';
 
 const ADMIN_LINKS = [
   { to: '/carrinhos', label: 'Carrinhos', icon: 'cart', desc: 'Fotos, categorias e status' },
@@ -19,12 +21,14 @@ const ADMIN_LINKS = [
 ];
 
 export function AppLayout() {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, endImpersonation } = useAuth();
   const { connected } = useSocket();
   const location = useLocation();
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
   const [installOpen, setInstallOpen] = useState(false);
+  const [soundOpen, setSoundOpen] = useState(false);
+  const [endingSupport, setEndingSupport] = useState(false);
   const { canPrompt, standalone } = useInstallState();
 
   useEffect(() => {
@@ -47,6 +51,16 @@ export function AppLayout() {
 
   const isMoreActive =
     isAdmin && ADMIN_LINKS.some((link) => location.pathname.startsWith(link.to));
+
+  const handleEndSupport = async () => {
+    setEndingSupport(true);
+    try {
+      await endImpersonation();
+      navigate('/', { replace: true });
+    } finally {
+      setEndingSupport(false);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -109,6 +123,19 @@ export function AppLayout() {
           <IconButton icon="logout" label="Sair" onClick={handleLogout} className="topbar__logout" />
         </div>
       </header>
+
+      {user?.impersonation && (
+        <div className="impersonation-bar" role="status">
+          <span className="impersonation-bar__dot" />
+          <div>
+            <strong>Modo suporte · {user.tenantName}</strong>
+            <span>Motivo: {user.impersonation.motivo}</span>
+          </div>
+          <Button size="sm" variant="ghost" icon="logout" loading={endingSupport} onClick={handleEndSupport}>
+            Sair do suporte
+          </Button>
+        </div>
+      )}
 
       <main className="app-main">
         <Outlet />
@@ -173,6 +200,20 @@ export function AppLayout() {
             <button
               type="button"
               className="more-sheet__item"
+              onClick={() => { setSoundOpen(true); setMoreOpen(false); }}
+            >
+              <span className="more-sheet__item-icon">
+                <Icon name="sound" size={20} />
+              </span>
+              <span className="more-sheet__item-text">
+                <strong>Som e vibração</strong>
+                <small>Volume, som do alerta e vibrar</small>
+              </span>
+              <Icon name="chevronRight" size={18} />
+            </button>
+            <button
+              type="button"
+              className="more-sheet__item"
               onClick={() => navigate('/alterar-senha')}
             >
               <span className="more-sheet__item-icon">
@@ -199,6 +240,7 @@ export function AppLayout() {
           </div>
 
           <div className="more-sheet__status">
+            {user?.telefone && <span className="muted small">{formatPhoneDisplay(user.telefone)}</span>}
             <span className={`status-line ${connected ? 'is-online' : 'is-offline'}`}>
               <span className="connection-chip__dot" />
               {connected ? 'Conectado ao servidor local' : 'Sem conexão em tempo real'}
@@ -211,6 +253,7 @@ export function AppLayout() {
       </Modal>
 
       <InstallInstructionsModal open={installOpen} onClose={() => setInstallOpen(false)} />
+      <SoundSettingsModal open={soundOpen} onClose={() => setSoundOpen(false)} />
     </div>
   );
 }

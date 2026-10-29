@@ -76,7 +76,7 @@ export default defineConfig({
           /^\/socket\.io\//,
           /^\/uploads\//,
         ],
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,woff2,wav}'],
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {

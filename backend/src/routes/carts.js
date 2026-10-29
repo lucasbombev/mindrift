@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { requireAdmin } from '../middleware/auth.js';
 import { uploadCartPhoto, validateUploadedPhoto, uploadedPhotoUrl, removeUploadedByUrl } from '../services/upload.js';
 import { requireCategory } from '../services/categories.js';
+import { listCartStatusEvents, logCartStatus } from '../services/cartStatus.js';
 import { badRequest, conflict, forbidden, notFound } from '../utils/errors.js';
 import { nowIso } from '../utils/time.js';
 import { serializeCart } from '../services/dashboard.js';
@@ -34,6 +35,14 @@ const updateSchema = z.object({
 });
 
 const checkinSchema = z.object({
+  observacao: z.string().trim().max(300).optional().nullable(),
+});
+
+const STATUS_MOTIVES = ['bateria', 'motor', 'pneu', 'estrutura', 'outro'];
+
+const statusSchema = z.object({
+  status: z.enum(STATUSES),
+  motivo: z.enum(STATUS_MOTIVES).nullable().optional(),
   observacao: z.string().trim().max(300).optional().nullable(),
 });
 
@@ -209,6 +218,9 @@ export function createCartsRouter(db) {
         id,
         req.tenantId,
       );
+      if (body.status && body.status !== row.status) {
+        logCartStatus(db, req.tenantId, id, row.status, body.status, 'ajuste_admin', body.observacao || null, req.user.id);
+      }
       if (oldPhotoToRemove) removeUploadedByUrl(oldPhotoToRemove);
       const fresh = getCart(db, req.tenantId, id);
       req.app.locals.broadcast?.(req.tenantId);
@@ -246,8 +258,68 @@ export function createCartsRouter(db) {
         `UPDATE carts SET status = 'disponivel', observacao = ?, atualizado_em = ?
          WHERE id = ? AND tenant_id = ?`,
       ).run(observacao, nowIso(), id, req.tenantId);
+      logCartStatus(db, req.tenantId, id, row.status, 'disponivel', 'checkin', body.observacao || null, req.user.id);
       req.app.locals.broadcast?.(req.tenantId);
       res.json({ item: serializeCart(getCart(db, req.tenantId, id)), mensagem: 'Check-in concluído.' });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/:id/status-events', (req, res, next) => {
+    try {
+      const id = Number(req.params.id);
+      const row = getCart(db, req.tenantId, id);
+      if (!row) throw notFound('Carrinho não encontrado.');
+      res.json({ items: listCartStatusEvents(db, req.tenantId, id) });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/:id/status', (req, res, next) => {
+    try {
+      const id = Number(req.params.id);
+      const row = getCart(db, req.tenantId, id);
+      if (!row) throw notFound('Carrinho não encontrado.');
+      const active = activeSessionForCart(db, req.tenantId, id);
+      if (active || row.status === 'em_uso') {
+        throw conflict('Encerre a sessão primeiro.', 'carrinho_em_uso');
+      }
+      const body = statusSchema.parse(req.body);
+      if (body.status === row.status) {
+        return res.json({ item: serializeCart(row), mensagem: 'Status já está atualizado.' });
+      }
+      if (body.status === 'manutencao' && !body.motivo) {
+        throw badRequest('Informe o motivo da manutenção.');
+      }
+      const observacao = body.observacao ? body.observacao.trim() : null;
+      if (body.status === 'manutencao' && body.motivo === 'outro' && (!observacao || observacao.length < 3)) {
+        throw badRequest('Descreva a manutenção em “outro”.');
+      }
+      const now = nowIso();
+      db.prepare(
+        `UPDATE carts SET status = ?, observacao = ?, atualizado_em = ?
+         WHERE id = ? AND tenant_id = ?`,
+      ).run(
+        body.status,
+        body.status === 'manutencao' ? observacao || row.observacao : row.observacao,
+        now,
+        id,
+        req.tenantId,
+      );
+      logCartStatus(
+        db,
+        req.tenantId,
+        id,
+        row.status,
+        body.status,
+        body.motivo || null,
+        observacao,
+        req.user.id,
+      );
+      req.app.locals.broadcast?.(req.tenantId);
+      res.json({ item: serializeCart(getCart(db, req.tenantId, id)) });
     } catch (err) {
       next(err);
     }

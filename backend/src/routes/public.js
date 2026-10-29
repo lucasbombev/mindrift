@@ -13,6 +13,7 @@ const signupSchema = z.object({
   nome: z.string().trim().min(2, 'Informe o nome do negócio.').max(80),
   adminNome: z.string().trim().min(2, 'Informe o nome do administrador.').max(80),
   email: z.string().trim().email('E-mail inválido.').max(120),
+  telefone: z.string().trim().min(1, 'Informe o telefone.'),
   senha: z.string().min(8, 'A senha deve ter pelo menos 8 caracteres.').max(72),
 });
 

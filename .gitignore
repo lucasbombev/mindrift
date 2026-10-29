@@ -11,3 +11,5 @@ backend/certs/
 *.log
 .DS_Store
 coverage/
+
+backend/logs/

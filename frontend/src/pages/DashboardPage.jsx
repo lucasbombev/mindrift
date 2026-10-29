@@ -11,6 +11,7 @@ import { useTimerAlerts } from '../hooks/useTimerAlerts.js';
 import { CartCard } from '../components/CartCard.jsx';
 import { ExpiredAlertsOverlay, LeadAlertBanner } from '../components/Alerts.jsx';
 import { EndSessionModal, RenewSessionModal, StartSessionModal } from '../components/sessionModals.jsx';
+import { CartStatusModal } from '../components/CartStatusModal.jsx';
 import {
   Button,
   EmptyState,
@@ -55,6 +56,8 @@ export function DashboardPage() {
   const [serverOffset, setServerOffset] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [statusCart, setStatusCart] = useState(null);
   const localNow = useNow(500);
   const serverNow = localNow + serverOffset;
 
@@ -204,6 +207,21 @@ export function DashboardPage() {
           </Button>
         </div>
       </div>
+
+      <div className="tenant-health">
+        <span className="tenant-health__dot" />
+        <strong>Sistema operacional</strong>
+      </div>
+
+      {data.globalBanner && !bannerDismissed && (
+        <div className={`global-banner global-banner--${data.globalBanner.tipo || 'info'}`} role="status">
+          <Icon name="info" size={18} />
+          <span>{data.globalBanner.mensagem}</span>
+          <button type="button" aria-label="Dispensar comunicado" onClick={() => setBannerDismissed(true)}>
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+      )}
 
       {!soundEnabled && (
         <button type="button" className="sound-hint" onClick={handleSound}>
@@ -355,6 +373,7 @@ export function DashboardPage() {
               onStart={(selected) => setModal({ type: 'start', cart: selected })}
               onRenew={(session) => setModal({ type: 'renew', session })}
               onEnd={(session) => setModal({ type: 'end', session })}
+              onStatusChange={(cart) => setStatusCart(cart)}
             />
           ))}
         </div>
@@ -374,6 +393,12 @@ export function DashboardPage() {
           onSuccess={refreshAfterAction}
         />
       )}
+      <CartStatusModal
+        open={Boolean(statusCart)}
+        cart={statusCart}
+        onClose={() => setStatusCart(null)}
+        onSuccess={() => { setStatusCart(null); load(true); }}
+      />
       {modal?.type === 'renew' && (
         <RenewSessionModal
           open

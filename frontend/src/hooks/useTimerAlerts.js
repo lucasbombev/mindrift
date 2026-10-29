@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSocketEvent } from '../context/SocketContext.jsx';
-import {
-  alertFeedback,
-  audioReady,
-  playEndAlarm,
-  primeAudio,
-  subscribeAudio,
-  vibrate,
-} from '../lib/audio.js';
+import { audioReady, playSound, primeAudio, subscribeAudio, vibrate } from '../lib/audio.js';
+import { useSoundPrefs } from '../context/SoundContext.jsx';
 import { requestNotifications, showTimerNotification } from '../lib/pwa.js';
 
 const ACK_PREFIX = 'drift.ack.';
@@ -33,7 +27,9 @@ function setAcknowledged(key) {
 }
 
 export function useTimerAlerts({ sessions, alertLeadSeconds, soundEnabled, onSoundEnabled, serverOffset = 0 }) {
+  const { prefs } = useSoundPrefs();
   const [alerts, setAlerts] = useState([]);
+  const prefsRef = useRef(prefs);
   const seenRef = useRef(new Set());
   const soundRef = useRef(soundEnabled);
   const sessionsRef = useRef(sessions);
@@ -46,6 +42,10 @@ export function useTimerAlerts({ sessions, alertLeadSeconds, soundEnabled, onSou
   useEffect(() => {
     soundRef.current = soundEnabled;
   }, [soundEnabled]);
+
+  useEffect(() => {
+    prefsRef.current = prefs;
+  }, [prefs]);
 
   useEffect(() => {
     sessionsRef.current = sessions;
@@ -64,9 +64,13 @@ export function useTimerAlerts({ sessions, alertLeadSeconds, soundEnabled, onSou
     if (seenRef.current.has(key)) return;
     seenRef.current.add(key);
 
+    const pref = prefsRef.current || {};
+    const soundName = pref.somNome || pref.tenant?.somFim || 'alarme';
+    const volume = pref.volume ?? 70;
+    const shouldVibrate = pref.vibrar !== false;
     if (stage === 'end') {
-      if (soundRef.current) playEndAlarm();
-      vibrate([500, 160, 500, 160, 500]);
+      if (soundRef.current) playSound(soundName, { volume });
+      if (shouldVibrate) vibrate([500, 160, 500, 160, 500]);
       if (document.hidden) {
         showTimerNotification({
           title: '⏰ Tempo esgotado!',
@@ -75,8 +79,8 @@ export function useTimerAlerts({ sessions, alertLeadSeconds, soundEnabled, onSou
         });
       }
     } else {
-      if (soundRef.current) alertFeedback('lead');
-      else vibrate([160, 90, 160]);
+      if (soundRef.current) playSound('beep', { volume });
+      if (shouldVibrate) vibrate([160, 90, 160]);
     }
 
     setAlerts((current) => {
@@ -146,12 +150,19 @@ export function useTimerAlerts({ sessions, alertLeadSeconds, soundEnabled, onSou
   const hasEndAlert = alerts.some((item) => item.stage === 'end');
   useEffect(() => {
     if (!hasEndAlert) return undefined;
+    const pref = prefs || {};
+    if (pref.tenant?.repetir === false) return undefined;
     const timer = setInterval(() => {
-      if (audioReady()) playEndAlarm();
-      vibrate([500, 160, 500]);
+      const current = prefsRef.current || {};
+      if (soundRef.current) {
+        playSound(current.somNome || current.tenant?.somFim || 'alarme', {
+          volume: current.volume ?? 70,
+        });
+      }
+      if (current.vibrar !== false) vibrate([500, 160, 500]);
     }, 12000);
     return () => clearInterval(timer);
-  }, [hasEndAlert]);
+  }, [hasEndAlert, prefs?.tenant?.repetir]);
 
   // Título piscando quando há tempo esgotado.
   useEffect(() => {

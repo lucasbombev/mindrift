@@ -37,6 +37,8 @@ export const config = {
   dbPath: resolvePath(process.env.DB_PATH, 'data/drift.db'),
   uploadDir: resolvePath(process.env.UPLOAD_DIR, 'uploads'),
   backupDir: resolvePath(process.env.BACKUP_DIR, 'backups'),
+  logPath: resolvePath(process.env.LOG_PATH, 'logs/drift.log'),
+  tailscaleUrl: process.env.TAILSCALE_URL || '',
   jwtSecret,
   refreshSecret: process.env.JWT_REFRESH_SECRET || `${jwtSecret}:refresh`,
   accessTokenTtl: process.env.ACCESS_TOKEN_TTL || '12h',
@@ -59,7 +61,7 @@ export const config = {
 };
 
 export function assertRuntimeDirs() {
-  for (const dir of [path.dirname(config.dbPath), config.uploadDir, config.backupDir]) {
+  for (const dir of [path.dirname(config.dbPath), config.uploadDir, config.backupDir, path.dirname(config.logPath)]) {
     fs.mkdirSync(dir, { recursive: true });
   }
 }

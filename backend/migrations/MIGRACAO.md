@@ -83,3 +83,32 @@ O arquivo SQL de referência do schema final é
 [`001_multi_tenant.sql`](./001_multi_tenant.sql). Ele é idempotente para criação
 de schema novo (`CREATE TABLE/INDEX IF NOT EXISTS`); a cópia de dados legados e
 o controle de versão são feitos pelo runner em `backend/src/db.js`.
+
+## Migração 002 (v4) — superadmin, sistema, telefone, som e status
+
+A versão 4 adiciona:
+
+- `tenants.excluido_em` (soft delete);
+- `users.telefone` (E.164 brasileiro);
+- `cart_status_events`, `audit_logs`, `user_sound_preferences`, `global_announcements`;
+- padrões de som por tenant (`som_fim`, `som_repetir`) sem sobrescrever escolhas existentes.
+
+O runner cria um novo backup antes de adicionar as colunas e usa
+`ALTER TABLE ... ADD COLUMN` somente quando a coluna ainda não existe. O schema
+de referência está em [`002_superadmin_system_sounds.sql`](./002_superadmin_system_sounds.sql).
+
+### Rollback v4
+
+Pare o servidor e restaure o backup mais recente que comece com
+`pre-migration-` ou o backup manual `pre-v4-*.db`:
+
+```bash
+cd /home/lucas/Documents/DriftApp
+cp backend/data/drift.db backend/backups/antes-rollback-v4.db
+cp backend/backups/pre-v4-20261029-011445.db backend/data/drift.db
+rm -f backend/data/drift.db-wal backend/data/drift.db-shm
+npm start
+```
+
+Na primeira abertura após restaurar, o código v4 migra novamente o banco v3 e
+recria as estruturas. Para voltar também o código, use a versão anterior do app.

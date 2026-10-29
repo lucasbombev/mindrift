@@ -4,7 +4,8 @@ import { config } from '../config.js';
 import { unauthorized } from '../utils/errors.js';
 
 export const USER_WITH_TENANT_SELECT = `
-  SELECT u.*, t.nome AS tenant_nome, t.slug AS tenant_slug, t.ativo AS tenant_ativo
+  SELECT u.*, t.nome AS tenant_nome, t.slug AS tenant_slug, t.ativo AS tenant_ativo,
+         t.excluido_em AS tenant_excluido_em
   FROM users u
   LEFT JOIN tenants t ON t.id = u.tenant_id
 `;
@@ -24,6 +25,7 @@ export function publicUser(row) {
     nome: row.nome,
     username: row.username,
     email: row.email || null,
+    telefone: row.telefone || null,
     role: row.role,
     ativo: Boolean(row.ativo),
     mustChangePassword: Boolean(row.must_change_password),
@@ -40,9 +42,9 @@ export function verifyPassword(password, hash) {
   return bcrypt.compare(password, hash);
 }
 
-export function signAccessToken(user) {
+export function signAccessToken(user, extra = {}) {
   return jwt.sign(
-    { sub: String(user.id), role: user.role, tv: user.token_version, type: 'access' },
+    { sub: String(user.id), role: user.role, tv: user.token_version, type: 'access', ...extra },
     config.jwtSecret,
     { expiresIn: config.accessTokenTtl, issuer: 'drift-rent' },
   );
@@ -105,9 +107,9 @@ export function clearRefreshCookie(res) {
   res.clearCookie('drift_has_session', { path: '/' });
 }
 
-export function authPayload(user) {
+export function authPayload(user, accessExtra = {}) {
   return {
-    accessToken: signAccessToken(user),
+    accessToken: signAccessToken(user, accessExtra),
     refreshToken: signRefreshToken(user),
     user: publicUser(user),
   };

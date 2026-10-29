@@ -1,6 +1,7 @@
 import { hashPassword } from './auth.js';
 import { conflict, badRequest, notFound } from '../utils/errors.js';
 import { nowIso } from '../utils/time.js';
+import { normalizePhoneBR } from '../utils/phone.js';
 
 export const DEFAULT_CATEGORIES = [
   { nome: 'Drift', slug: 'drift', icone: '🏎️', cor: '#f97316' },
@@ -47,6 +48,8 @@ export function serializeTenant(row) {
     nome: row.nome,
     slug: row.slug,
     ativo: Boolean(row.ativo),
+    excluido: Boolean(row.excluido_em),
+    excluidoEm: row.excluido_em || null,
     criadoEm: row.criado_em,
   };
 }
@@ -89,6 +92,8 @@ export function seedTenantSettings(db, tenantId, businessName = 'Meu Negócio') 
      VALUES (?, ?, ?, ?)`,
   );
   insert.run(tenantId, 'alert_lead_seconds', '60', now);
+  insert.run(tenantId, 'som_fim', 'alarme', now);
+  insert.run(tenantId, 'som_repetir', '1', now);
   insert.run(tenantId, 'nome_estabelecimento', businessName, now);
 }
 
@@ -124,6 +129,7 @@ export async function createTenantWithAdmin(db, input) {
   const adminNome = String(input.adminNome || '').trim();
   const email = String(input.email || '').trim().toLowerCase();
   const senha = String(input.senha || '');
+  const telefone = normalizePhoneBR(input.telefone, { required: true });
   if (nome.length < 2) throw badRequest('Informe o nome do negócio.');
   if (adminNome.length < 2) throw badRequest('Informe o nome do administrador.');
   if (!email || !email.includes('@')) throw badRequest('Informe um e-mail válido.');
@@ -145,11 +151,11 @@ export async function createTenantWithAdmin(db, input) {
     seedTenantDefaults(db, tenantId, nome);
     const userInfo = db
       .prepare(
-        `INSERT INTO users (tenant_id, nome, username, email, senha_hash, role, ativo,
+        `INSERT INTO users (tenant_id, nome, username, email, telefone, senha_hash, role, ativo,
            must_change_password, token_version, criado_em, atualizado_em)
-         VALUES (?, ?, ?, ?, ?, 'admin', 1, 0, 1, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, 'admin', 1, 0, 1, ?, ?)`,
       )
-      .run(tenantId, adminNome, username, email, senhaHash, now, now);
+      .run(tenantId, adminNome, username, email, telefone, senhaHash, now, now);
     return { tenantId, userId: Number(userInfo.lastInsertRowid) };
   });
   const ids = run();

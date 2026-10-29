@@ -12,12 +12,14 @@ import { HttpError } from './utils/errors.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createPublicRouter } from './routes/public.js';
 import { createSuperadminRouter } from './routes/superadmin.js';
+import { createImpersonationRouter } from './routes/impersonation.js';
 import { createUsersRouter } from './routes/users.js';
 import { createCartsRouter } from './routes/carts.js';
 import { createPlansRouter } from './routes/plans.js';
 import { createCategoriesRouter } from './routes/categories.js';
 import { createScanRouter } from './routes/scan.js';
 import { createQrcodesRouter } from './routes/qrcodes.js';
+import { createPreferencesRouter } from './routes/preferences.js';
 import { createSessionsRouter } from './routes/sessions.js';
 import { createDashboardRouter } from './routes/dashboard.js';
 import { createReportsRouter } from './routes/reports.js';
@@ -119,6 +121,7 @@ export function createApp({ db }) {
 
   // A partir daqui, todas as rotas exigem JWT válido.
   app.use('/api', requireAuth(db));
+  app.use('/api/impersonation', createImpersonationRouter(db));
   // Superadmin só acessa o painel de negócios.
   app.use('/api/superadmin', requireSuperadmin, createSuperadminRouter(db));
   // Qualquer outra rota /api é operacional e exige um tenant ativo.
@@ -130,6 +133,7 @@ export function createApp({ db }) {
   app.use('/api/categories', createCategoriesRouter(db));
   app.use('/api/scan', createScanRouter(db));
   app.use('/api/qrcodes', createQrcodesRouter(db));
+  app.use('/api/preferences', createPreferencesRouter(db));
   app.use('/api/sessions', createSessionsRouter(db));
   app.use('/api/reports', createReportsRouter(db));
   app.use('/api/cash', createCashRouter(db));

@@ -59,8 +59,11 @@ function findLoginUser(db, identifier) {
 
 function assertTenantCanLogin(row) {
   if (row.role === 'superadmin') return;
-  if (!row.tenant_id || !row.tenant_ativo) {
-    throw forbidden('Este negócio está inativo. Fale com o suporte.', 'negocio_inativo');
+  if (!row.tenant_id || row.tenant_excluido_em) {
+    throw forbidden('Negócio indisponível. Fale com o suporte.', 'negocio_indisponivel');
+  }
+  if (!row.tenant_ativo) {
+    throw forbidden('Este negócio está suspenso. Fale com o suporte.', 'negocio_suspenso');
   }
 }
 

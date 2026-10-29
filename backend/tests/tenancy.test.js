@@ -45,6 +45,7 @@ test('tenant A e tenant B ficam isolados; signup cria categorias e planos padrã
     nome: 'Praça B',
     adminNome: 'Admin B',
     email: 'adminb@example.com',
+    telefone: '(11) 91234-5678',
     senha: 'SenhaB1234',
   });
   assert.equal(signupB.status, 201, JSON.stringify(signupB.body));
@@ -76,7 +77,7 @@ test('tenant A e tenant B ficam isolados; signup cria categorias e planos padrã
   const superCreateAsAdmin = await api
     .post('/api/superadmin/tenants')
     .set(auth(tokenA))
-    .send({ nome: 'Invasor', adminNome: 'Invasor', email: 'invasor@example.com', senha: 'Invasor123' });
+    .send({ nome: 'Invasor', adminNome: 'Invasor', email: 'invasor@example.com', telefone: '(11) 93456-7890', senha: 'Invasor123' });
   assert.equal(superCreateAsAdmin.status, 403);
   const usersB = await api.get('/api/users').set(auth(tokenB));
   assert.ok(usersB.body.items.every((u) => u.tenantId === signupB.body.tenant.id));
@@ -117,7 +118,7 @@ test('superadmin lista/desativa tenants, mas não acessa dados operacionais', as
   const createdTenant = await api
     .post('/api/superadmin/tenants')
     .set(auth(superToken))
-    .send({ nome: 'Terceiro Negócio', adminNome: 'Terceiro Admin', email: 'terceiro@example.com', senha: 'Terceiro123' });
+    .send({ nome: 'Terceiro Negócio', adminNome: 'Terceiro Admin', email: 'terceiro@example.com', telefone: '(11) 92345-6789', senha: 'Terceiro123' });
   assert.equal(createdTenant.status, 201, JSON.stringify(createdTenant.body));
   assert.equal(createdTenant.body.item.nome, 'Terceiro Negócio');
   const createdLogin = await api.post('/api/auth/login').send({

@@ -3,6 +3,7 @@ import {
   ApiError,
   api,
   clearAccessToken,
+  getAccessToken,
   hasAccessToken,
   refreshAccessToken,
   setAccessToken,
@@ -66,14 +67,60 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
+  const startImpersonation = useCallback(async (tenantId, motivo) => {
+    try {
+      sessionStorage.setItem(
+        'drift.imp.backup',
+        JSON.stringify({ token: getAccessToken(), user }),
+      );
+    } catch { /* sessionStorage indisponível */ }
+    const data = await api.post(`/superadmin/tenants/${tenantId}/impersonate`, { motivo });
+    setAccessToken(data.accessToken);
+    setUser(data.user);
+    return data;
+  }, [user]);
+
+  const endImpersonation = useCallback(async () => {
+    const current = user;
+    if (current?.impersonation?.id) {
+      try {
+        await api.post(`/impersonation/${current.impersonation.id}/end`);
+      } catch {
+        /* a auditoria pode já ter sido encerrada */
+      }
+    }
+    let backup = null;
+    try {
+      backup = JSON.parse(sessionStorage.getItem('drift.imp.backup') || 'null');
+      sessionStorage.removeItem('drift.imp.backup');
+    } catch { /* noop */ }
+    if (backup?.token) {
+      setAccessToken(backup.token);
+      try {
+        const data = await api.get('/auth/me');
+        setUser(data.user);
+        return data.user;
+      } catch {
+        clearSession();
+        return null;
+      }
+    }
+    clearSession();
+    return null;
+  }, [user, clearSession]);
+
   const logout = useCallback(async () => {
     try {
+      if (user?.impersonation?.id) {
+        await api.post(`/impersonation/${user.impersonation.id}/end`);
+      }
       await api.post('/auth/logout');
     } catch {
       /* mesmo sem rede, limpa a sessão local */
     }
+    try { sessionStorage.removeItem('drift.imp.backup'); } catch { /* noop */ }
     clearSession();
-  }, [clearSession]);
+  }, [clearSession, user]);
 
   const changePassword = useCallback(async (senhaAtual, senhaNova) => {
     const data = await api.post('/auth/change-password', {
@@ -99,13 +146,15 @@ export function AuthProvider({ children }) {
       login,
       signup,
       logout,
+      startImpersonation,
+      endImpersonation,
       changePassword,
       refreshUser,
       retryBoot: boot,
       isAdmin: user?.role === 'admin',
       isSuperadmin: user?.role === 'superadmin',
     }),
-    [user, loading, bootError, login, signup, logout, changePassword, refreshUser, boot],
+    [user, loading, bootError, login, signup, logout, startImpersonation, endImpersonation, changePassword, refreshUser, boot],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

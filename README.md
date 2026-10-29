@@ -14,6 +14,10 @@ sessões, caixa e configurações. Um administrador **nunca** acessa dados de ou
 - **QR Code** por carrinho com impressão de etiquetas 5 × 5 cm, PDF A4 e leitura pela câmera.
 - **Check-in/check-out visual**: encerrar escolhendo o destino do equipamento em 1 toque.
 - **Cliente opcional**, editável depois, com relatórios agrupando “Sem identificação”.
+- **Superadmin completo**: ciclo de vida de tenants, métricas, impersonação auditada, reset/transferência de admin, comunicado global e painel **Sistema**.
+- **Telefone** do usuário com máscara brasileira e E.164.
+- **Som configurável** por tenant e por usuário (6 sons locais, volume, vibração e repetição).
+- **Operador pode alterar status** do carrinho com motivo e histórico (`CartStatusEvent`).
 
 ---
 
@@ -140,15 +144,26 @@ Cada negócio começa vazio de carrinhos. O admin cadastra a frota, operadores e
 
 ### Superadmin
 
-O superadmin não é um admin de negócio. Ele só acessa a tela **Negócios**:
+O superadmin não é um admin de negócio. Ele acessa **Negócios** e **Sistema**.
 
-- lista tenants com contagem de usuários e o e-mail do admin;
-- cria novos negócios (tenant + admin inicial + categorias/planos padrão);
-- ativa/desativa negócios;
-- não baixa backups nem dados operacionais.
+**Negócios**
+- métricas globais: tenants ativos, total de carrinhos e sessões do dia;
+- cria negócios (tenant + admin inicial + categorias/planos + telefone obrigatório);
+- suspende, reativa, faz soft delete, restaura e faz hard delete (com segunda confirmação pelo slug/nome);
+- transfere o admin para outro usuário do tenant;
+- gera senha temporária para o admin (troca obrigatória no primeiro login);
+- entra no tenant em **impersonação auditada** com motivo; o acesso fica em `audit_logs` com início/fim;
+- publica **comunicado global** exibido no dashboard de todos os tenants.
 
-Ele **não** acessa `/api/dashboard`, sessões, caixa, relatórios ou qualquer dado operacional
-desses tenants (a API responde 403).
+**Sistema**
+- hostname, IPs, uptime, versão, URL do Tailscale Serve, HTTPS/secure context;
+- conexões WebSocket, tamanho do banco, último backup, espaço livre;
+- tail de logs e download de log;
+- botões **Rodar backup agora**, **Baixar backup** e **Baixar log**.
+
+Fora da impersonação, o superadmin **não** acessa `/api/dashboard`, sessões, caixa, relatórios ou
+qualquer dado operacional (a API responde 403). A impersonação gera um token temporário de admin e
+um registro de auditoria; ao sair, o acesso é encerrado e o token deixa de funcionar.
 
 ### Isolamento
 
@@ -159,8 +174,9 @@ desses tenants (a API responde 403).
 - Socket.IO usa salas `tenant:<id>`; dashboard e avisos de timer são emitidos só para a sala do
   tenant.
 - Configurações, fechamentos de caixa e eventos também são por tenant.
-- Backups do banco são arquivos do servidor. Não há download de banco inteiro pelo app; use
-  `npm run backup`/acesso ao filesystem no notebook.
+- Backups do banco são exclusivos do superadmin no menu **Sistema**; o admin do tenant não vê
+  infraestrutura, logs nem download do banco. O comando `npm run backup` continua disponível no
+  notebook.
 
 ---
 
@@ -208,10 +224,15 @@ Ao encerrar, o operador escolhe em **1 toque** o destino:
 O pagamento pode ser recebido no encerramento ou ficar pendente no histórico. O carrinho vai para o
 status escolhido independentemente do pagamento.
 
-### Outros status
+### Outros status e menu ⋮
 
 - **Carregando:** o operador pode fazer check-in pelo scan com **Marcar como Disponível**.
 - **Manutenção:** somente admin libera pelo scan, com campo de observação.
+- Em todo card há um menu **⋮** com os status válidos (disponível ↔ carregando ↔ manutenção)
+  quando não há sessão ativa. Entrar em manutenção exige motivo (bateria, motor, pneu, estrutura ou
+  outro + observação) e grava um `CartStatusEvent`.
+- Em carrinho em uso o botão fica desabilitado com o aviso **“Encerre a sessão primeiro”**.
+- O histórico do modal de status mostra as últimas mudanças e o autor.
 - **Disponível:** oferece **Iniciar aluguel agora**.
 - **Em uso:** oferece **Renovar**, **Encerrar**, **Registrar pagamento** e **Editar cliente**.
 
@@ -268,12 +289,31 @@ iOS sem app nativo.
 
 ---
 
+## 7.1 Telefone, som e vibração
+
+- O cadastro público exige telefone do admin no formato **(DD) 9XXXX-XXXX**; o backend salva em
+  E.164 (`+55DD9XXXXXXXX`). Operadores podem ficar sem telefone.
+- O telefone aparece no perfil, na lista de usuários e no painel de negócios do superadmin.
+- Admin define em **Ajustes** o som padrão, o pré-alerta (60/30/desligado) e a repetição até
+  dispensar.
+- Cada usuário escolhe em **Mais → Som e vibração** o som, o volume (0–100) e se quer vibrar.
+  Os seis sons são arquivos WAV locais (`beep`, `sino`, `alarme`, `bipe-duplo`, `apito`,
+  `campainha`) e tocam via Web Audio API. O áudio é desbloqueado no primeiro toque.
+- As preferências ficam no banco e valem no próximo alerta, inclusive após fechar/reabrir o PWA.
+
+## 7.2 Menu Sistema (superadmin)
+
+O menu **Sistema** é exclusivo do superadmin e concentra hostname, IPs, uptime, versão, URL do
+Tailscale Serve, HTTPS/secure context, conexões WebSocket, tamanho do banco, último backup, espaço
+livre, tail de logs, download de log/backup e **Rodar backup agora**. O painel do tenant mostra
+apenas o indicador verde/vermelho **Sistema operacional**.
+
 ## 8. Perfis e permissões
 
 | Ação | Superadmin | Admin do tenant | Operador |
 |---|---|---|---|
 | Criar/desativar tenant | ✅ | ❌ | ❌ |
-| Ver/gerenciar dados operacionais | ❌ | ✅ (próprio tenant) | ✅ (próprio tenant) |
+| Ver/gerenciar dados operacionais | ❌ (só impersonação) | ✅ (próprio tenant) | ✅ (próprio tenant) |
 | Criar/editar carrinhos, planos, categorias | ❌ | ✅ | ❌ |
 | Gerenciar usuários | ❌ | ✅ | ❌ |
 | Iniciar/renovar/encerrar sessão | ❌ | ✅ | ✅ |
@@ -282,6 +322,10 @@ iOS sem app nativo.
 | Cancelar/excluir sessão | ❌ | ✅ | ❌ |
 | Caixa, relatórios, configurações | ❌ | ✅ | ❌ |
 | QR Codes / imprimir etiquetas | ❌ | ✅ | ❌ |
+| Alterar status do carrinho (sem sessão) | ❌ | ✅ | ✅ |
+| Ver infraestrutura/logs/backups | ✅ (Sistema) | ❌ | ❌ |
+| Impersonar admin e resetar senha | ✅ | ❌ | ❌ |
+| Comunicado global | ✅ | ❌ | ❌ |
 
 ---
 
@@ -291,6 +335,8 @@ O schema atual inclui:
 
 - `tenants`, `categories`, `users` (com `superadmin`), `carts`, `pricing_plans`, `sessions`,
   `session_events`, `settings`, `cash_closures`, `schema_migrations`;
+- v4: `tenants.excluido_em`, `users.telefone`, `cart_status_events`, `audit_logs`,
+  `user_sound_preferences`, `global_announcements`;
 - `tenant_id` indexado e com FK em todas as tabelas operacionais;
 - `carts.category_id` obrigatório, `carts.qr_token` único, `pricing_plans.category_id` opcional;
 - `sessions.cliente_nome` nullable;
@@ -301,7 +347,7 @@ A migração é automática, transacional e idempotente. Ela detecta banco legad
 (`default`). O admin atual continua no tenant default; o superadmin é criado pelo seed.
 
 Detalhes e rollback: **[backend/migrations/MIGRACAO.md](backend/migrations/MIGRACAO.md)**.
-Schema final de referência: **[backend/migrations/001_multi_tenant.sql](backend/migrations/001_multi_tenant.sql)**.
+Schema de referência: **[backend/migrations/001_multi_tenant.sql](backend/migrations/001_multi_tenant.sql)** (v3) e **[backend/migrations/002_superadmin_system_sounds.sql](backend/migrations/002_superadmin_system_sounds.sql)** (v4).
 
 ### Restauração manual
 
@@ -313,8 +359,8 @@ rm -f backend/data/drift.db-wal backend/data/drift.db-shm
 npm start
 ```
 
-Backups automáticos continuam rodando diariamente (horário/retenção em `backend/.env`). O download
-do banco inteiro não é exposto pelo app; use `npm run backup` e o filesystem do notebook.
+Backups automáticos continuam rodando diariamente (horário/retenção em `backend/.env`). O
+superadmin pode criar/baixar backups no menu **Sistema**; o admin do tenant não.
 
 ---
 
@@ -326,9 +372,10 @@ do banco inteiro não é exposto pelo app; use `npm run backup` e o filesystem d
 npm test
 ```
 
-Cobre autenticação/refresh, rate limit, adiantado, renovação, encerramento, caixa, isolamento entre
-tenants, signup público, desativação por superadmin, categorias, planos por categoria, QR/PDF,
-check-in, destino do carrinho e cliente opcional.
+**34 testes** cobrem autenticação/refresh, rate limit, adiantado, renovação, encerramento, caixa, isolamento entre
+tenants, signup público, suspensão/bloqueio, impersonação auditada, reset/transferência de admin,
+soft/hard delete, métricas, comunicado global, categorias, planos por categoria, QR/PDF, check-in,
+destino do carrinho, telefone, preferências de som e mudança de status com `CartStatusEvent`.
 
 ### Manual no celular (via Tailscale)
 
@@ -364,6 +411,28 @@ Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no cel
 - [ ] Editar o nome no histórico; conferir a alteração e o evento de auditoria.
 - [ ] Relatório de pendências mostra “Sem identificação” para o cliente nulo.
 
+**Superadmin / Sistema**
+- [ ] Suspender um tenant; admin e operador recebem **403** com mensagem de negócio suspenso.
+- [ ] Entrar como admin de um tenant com motivo; confirmar o banner **Modo suporte**; sair e voltar ao superadmin.
+- [ ] No menu **Sistema**, conferir hostname/IP/uptime/Tailscale/HTTPS/WebSocket/banco/backup/espaço, baixar log e rodar backup.
+- [ ] Resetar senha do admin; entrar com a senha temporária e confirmar a troca obrigatória.
+- [ ] Transferir admin para outro usuário; confirmar que o novo usuário entra como admin.
+- [ ] Publicar comunicado global e conferir o banner no dashboard de outro tenant.
+- [ ] Soft delete, restaurar e hard delete (com segunda confirmação) de um tenant de teste.
+
+**Telefone e som**
+- [ ] Cadastro público sem telefone é recusado; com **(DD) 9XXXX-XXXX** é aceito e salvo em E.164.
+- [ ] Operador sem telefone é aceito; telefone aparece no perfil e na listagem do superadmin.
+- [ ] Em **Mais → Som e vibração**, escolher sino, volume 35, desligar vibração e testar cada som.
+- [ ] Recarregar o PWA e confirmar que som/volume/vibração continuam salvos.
+- [ ] Admin ajusta som padrão, pré-alerta 60/30/desligado e repetição até dispensar; o próximo alerta usa a preferência.
+
+**Status do carrinho**
+- [ ] Operador abre **⋮** em um carrinho disponível e envia para manutenção com motivo **pneu** + observação.
+- [ ] Card mostra manutenção; tentar iniciar aluguel deve falhar; histórico do modal mostra o evento.
+- [ ] Em carrinho em uso, o botão **⋮** está desabilitado com o aviso “Encerre a sessão primeiro”.
+- [ ] Voltar para disponível/carregando e conferir cada transição.
+
 **Não regressões**
 - [ ] Timer continua no servidor ao fechar/abrir o app.
 - [ ] Renovação soma tempo e mantém o adiantado; adicional fica pendente.
@@ -383,6 +452,8 @@ JWT_REFRESH_SECRET=...
 DB_PATH=data/drift.db
 UPLOAD_DIR=uploads
 BACKUP_DIR=backups
+LOG_PATH=logs/drift.log
+TAILSCALE_URL=
 
 SUPERADMIN_USERNAME=superadmin
 SUPERADMIN_PASSWORD=superadmin123
@@ -424,7 +495,9 @@ npm run cert    # gera CA/certificado local
 - Rate limit global e no login/signup.
 - Autorização por tenant no backend, não só na UI.
 - Uploads usam nomes aleatórios; o diretório `/uploads` é público para exibir fotos.
-- O painel de tenants é exclusivo do superadmin; backups são arquivos locais do notebook.
+- O painel de tenants e o menu Sistema são exclusivos do superadmin; logs/backups ficam no notebook.
+- A impersonação é auditada e expira ao sair; o token de suporte deixa de funcionar após o fim.
+- Telefones são armazenados em E.164 (+55DD9XXXXXXXX).
 - O app foi feito para uma praça/rede local; não há billing, e-mail transacional ou recuperação de
   senha por e-mail.
 - O QR lê a câmera via HTTPS; HTTP puro no celular mostra apenas o fallback manual.
@@ -440,7 +513,10 @@ npm run cert    # gera CA/certificado local
 | Câmera não abre | Permita a câmera no navegador; em iOS/Android use HTTPS. O campo manual continua disponível. |
 | QR abre “não reconhecido” | O QR é de outro negócio, foi excluído ou a etiqueta foi gerada em outro endereço. Gere novamente pelo HTTPS correto. |
 | QR aponta para localhost | A etiqueta foi impressa pelo admin em `localhost`; abra o admin pelo Tailscale e baixe novamente. |
-| Admin não vê backups | O app não expõe download do banco inteiro; use `npm run backup` no notebook. |
+| Admin não vê backups | Backups/infra ficam no menu **Sistema** exclusivo do superadmin; o admin do tenant vê apenas o indicador de sistema. |
 | Login de tenant inativo | O superadmin precisa reativar o negócio. |
 | Porta 3000 em uso | Feche o outro processo ou altere `PORT`. |
 | Migração falhou | O rollback automático manteve o schema; restaure o `pre-migration-*.db` conforme `MIGRACAO.md`. |
+| Tenant suspenso | Superadmin deve reativar; o login retorna 403 com a mensagem de suspensão. |
+| Sons não tocam no iPhone | Toque na tela primeiro para desbloquear o AudioContext; verifique volume e preferências. |
+| Botão ⋮ do carrinho desabilitado | Há sessão ativa; encerre a sessão primeiro. |

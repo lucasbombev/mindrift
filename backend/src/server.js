@@ -10,6 +10,7 @@ import { seedDatabase } from './seed.js';
 import { authenticateToken } from './middleware/auth.js';
 import { getDashboard } from './services/dashboard.js';
 import { getLanUrls } from './services/system.js';
+import { installFileLogger } from './utils/logger.js';
 import {
   startBackupScheduler,
   startupBackupIfNeeded,
@@ -17,6 +18,7 @@ import {
 } from './services/backup.js';
 
 assertRuntimeDirs();
+installFileLogger(config.logPath);
 const db = openDb(config.dbPath);
 const seeded = await seedDatabase(db);
 
@@ -52,6 +54,11 @@ app.locals.broadcast = (tenantId) => {
 };
 app.locals.disconnectTenant = (tenantId) => {
   io.in(`tenant:${tenantId}`).disconnectSockets(true);
+};
+app.locals.broadcastAll = () => {
+  for (const tenant of db.prepare('SELECT id FROM tenants WHERE ativo = 1 AND excluido_em IS NULL').all()) {
+    io.to(`tenant:${tenant.id}`).emit('dashboard', getDashboard(db, tenant.id));
+  }
 };
 
 io.use((socket, next) => {

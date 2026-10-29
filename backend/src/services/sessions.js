@@ -2,6 +2,7 @@ import { badRequest, conflict, notFound } from '../utils/errors.js';
 import { addMinutes, nowIso } from '../utils/time.js';
 import { logEvent } from './audit.js';
 import { sessionAmounts } from './payments.js';
+import { logCartStatus } from './cartStatus.js';
 
 export const SESSION_SELECT = `
   SELECT s.*, c.codigo AS cart_codigo, c.foto_url AS cart_foto_url,
@@ -184,6 +185,7 @@ export function startSession(db, tenantId, input, operator) {
     db.prepare(
       "UPDATE carts SET status = 'em_uso', atualizado_em = ? WHERE id = ? AND tenant_id = ?",
     ).run(now, cart.id, tenantId);
+    logCartStatus(db, tenantId, cart.id, 'disponivel', 'em_uso', 'inicio_aluguel', null, operator.id);
 
     logEvent(db, tenantId, sessionId, 'inicio', operator.id, {
       carrinho: cart.codigo,
@@ -319,6 +321,7 @@ export function endSession(db, tenantId, id, input, operator) {
     db.prepare(
       'UPDATE carts SET status = ?, atualizado_em = ? WHERE id = ? AND tenant_id = ?',
     ).run(cartDestino, now, row.cart_id, tenantId);
+    logCartStatus(db, tenantId, row.cart_id, 'em_uso', cartDestino, 'destino_encerramento', null, operator.id);
 
     logEvent(db, tenantId, id, 'encerramento', operator.id, {
       encerradoEm: endedIso,
@@ -496,6 +499,7 @@ export function cancelSession(db, tenantId, id, input, operator) {
       db.prepare(
         "UPDATE carts SET status = 'disponivel', atualizado_em = ? WHERE id = ? AND tenant_id = ?",
       ).run(nowIso(), row.cart_id, tenantId);
+      logCartStatus(db, tenantId, row.cart_id, 'em_uso', 'disponivel', 'cancelamento', motivo, operator.id);
     }
     logEvent(db, tenantId, id, 'cancelamento', operator.id, {
       motivo,

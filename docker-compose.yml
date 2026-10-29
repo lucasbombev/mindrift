@@ -16,6 +16,7 @@ services:
       DB_PATH: data/drift.db
       UPLOAD_DIR: uploads
       BACKUP_DIR: backups
+      LOG_PATH: logs/drift.log
       ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-12h}
       REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL:-30d}
       BACKUP_HOUR: ${BACKUP_HOUR:-3}
@@ -30,6 +31,7 @@ services:
       - ./backend/data:/app/backend/data
       - ./backend/uploads:/app/backend/uploads
       - ./backend/backups:/app/backend/backups
+      - ./backend/logs:/app/backend/logs
       - ./backend/certs:/app/backend/certs:ro
     healthcheck:
       test:
