@@ -53,6 +53,8 @@ export function DashboardPage() {
   const [modal, setModal] = useState(null);
   const [soundEnabled, setSoundEnabled] = useState(audioReady());
   const [serverOffset, setServerOffset] = useState(0);
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const localNow = useNow(500);
   const serverNow = localNow + serverOffset;
 
@@ -151,6 +153,18 @@ export function DashboardPage() {
 
   const availableCarts = data.carts.filter((cart) => cart.status === 'disponivel');
   const summary = data.summary;
+  const filteredCarts = data.carts.filter(
+    (cart) =>
+      (categoryFilter === 'all' || cart.categoryId === Number(categoryFilter)) &&
+      (statusFilter === 'all' || cart.status === statusFilter),
+  );
+  const statusFilters = [
+    { value: 'all', label: 'Todos' },
+    { value: 'disponivel', label: 'Disponível' },
+    { value: 'em_uso', label: 'Em uso' },
+    { value: 'carregando', label: 'Carregando' },
+    { value: 'manutencao', label: 'Manutenção' },
+  ];
 
   return (
     <div className="container dashboard">
@@ -238,6 +252,40 @@ export function DashboardPage() {
         />
       </div>
 
+      <div className="category-filter" aria-label="Filtrar por categoria">
+        <button
+          type="button"
+          className={`filter-chip ${categoryFilter === 'all' ? 'is-active' : ''}`}
+          onClick={() => setCategoryFilter('all')}
+        >
+          <Icon name="filter" size={15} /> Todas
+        </button>
+        {data.categories.map((category) => (
+          <button
+            key={category.id}
+            type="button"
+            className={`filter-chip ${categoryFilter === String(category.id) ? 'is-active' : ''} ${category.ativo ? '' : 'is-inactive'}`}
+            style={{ '--category-color': category.cor }}
+            onClick={() => setCategoryFilter(String(category.id))}
+          >
+            <span aria-hidden="true">{category.icone}</span> {category.nome}
+          </button>
+        ))}
+      </div>
+
+      <div className="status-filter" aria-label="Filtrar por status">
+        {statusFilters.map((status) => (
+          <button
+            key={status.value}
+            type="button"
+            className={`filter-chip filter-chip--status ${statusFilter === status.value ? 'is-active' : ''}`}
+            onClick={() => setStatusFilter(status.value)}
+          >
+            {status.label}
+          </button>
+        ))}
+      </div>
+
       <div className="section-head">
         <div>
           <h2>Pista ao vivo</h2>
@@ -284,9 +332,20 @@ export function DashboardPage() {
             )
           }
         />
+      ) : filteredCarts.length === 0 ? (
+        <EmptyState
+          icon="filter"
+          title="Nenhum carrinho neste filtro"
+          text="Troque a categoria ou o status para ver outros carrinhos."
+          action={
+            <Button variant="secondary" onClick={() => { setCategoryFilter('all'); setStatusFilter('all'); }}>
+              Limpar filtros
+            </Button>
+          }
+        />
       ) : (
         <div className="cart-grid">
-          {data.carts.map((cart) => (
+          {filteredCarts.map((cart) => (
             <CartCard
               key={cart.id}
               cart={cart}

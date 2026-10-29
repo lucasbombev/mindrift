@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, downloadAuthenticated } from '../lib/api.js';
+import { api } from '../lib/api.js';
+import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { primeAudio, playEndAlarm } from '../lib/audio.js';
 import {
@@ -7,7 +8,6 @@ import {
   requestNotifications,
   secureContextInfo,
 } from '../lib/pwa.js';
-import { formatDateTime } from '../lib/format.js';
 import { InstallAppButton, InstallInstructionsModal } from '../components/InstallApp.jsx';
 import {
   Badge,
@@ -59,17 +59,16 @@ async function copyText(text) {
 }
 
 export function SettingsPage() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [settings, setSettings] = useState(null);
   const [system, setSystem] = useState(null);
-  const [backups, setBackups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [nome, setNome] = useState('');
   const [lead, setLead] = useState('60');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
-  const [backupLoading, setBackupLoading] = useState(false);
   const [installOpen, setInstallOpen] = useState(false);
   const [soundTesting, setSoundTesting] = useState(false);
   const [permission, setPermission] = useState(notificationPermission());
@@ -83,16 +82,14 @@ export function SettingsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [settingsData, systemData, backupsData] = await Promise.all([
+      const [settingsData, systemData] = await Promise.all([
         api.get('/settings'),
         api.get('/settings/system'),
-        api.get('/settings/backups'),
       ]);
       setSettings(settingsData.settings);
       setNome(settingsData.settings.nome_estabelecimento || 'Drift Rent');
       setLead(settingsData.settings.alert_lead_seconds || '60');
       setSystem(systemData);
-      setBackups(backupsData.items || []);
       setError('');
     } catch (err) {
       setError(err.message);
@@ -149,28 +146,6 @@ export function SettingsPage() {
     else if (result === 'unsupported') toast('Este navegador não suporta notificações.', { type: 'info' });
   };
 
-  const createBackup = async () => {
-    setBackupLoading(true);
-    try {
-      const data = await api.post('/settings/backups');
-      toast(`Backup criado: ${data.backup.filename}`, { type: 'success', title: 'Backup concluído' });
-      const backupsData = await api.get('/settings/backups');
-      setBackups(backupsData.items || []);
-    } catch (err) {
-      toast(err.message, { type: 'error' });
-    } finally {
-      setBackupLoading(false);
-    }
-  };
-
-  const downloadBackup = async (filename) => {
-    try {
-      await downloadAuthenticated(`/settings/backups/${encodeURIComponent(filename)}/download`, filename);
-    } catch (err) {
-      toast(err.message, { type: 'error' });
-    }
-  };
-
   const copyUrl = async (url) => {
     const ok = await copyText(url);
     toast(ok ? 'Endereço copiado.' : url, { type: ok ? 'success' : 'info' });
@@ -205,7 +180,7 @@ export function SettingsPage() {
     <div className="container">
       <PageHeader
         title="Ajustes"
-        subtitle="Alertas, rede local, backups e informações do servidor."
+        subtitle={`${user?.tenantName || 'Seu negócio'} · alertas, rede local e informações do servidor.`}
         eyebrow="Administração"
       />
 
@@ -312,48 +287,6 @@ export function SettingsPage() {
 
         <section className="settings-card">
           <header className="settings-card__head">
-            <span className="settings-card__icon"><Icon name="download" size={20} /></span>
-            <div>
-              <h2>Backups do banco</h2>
-              <p>Cópia diária automática e backups manuais.</p>
-            </div>
-            <Button size="sm" icon="plus" onClick={createBackup} loading={backupLoading}>
-              Criar agora
-            </Button>
-          </header>
-          <div className="backup-list">
-            {backups.length === 0 ? (
-              <p className="muted">Nenhum backup criado ainda.</p>
-            ) : (
-              backups.slice(0, 8).map((backup) => (
-                <div key={backup.filename} className="backup-row">
-                  <span className="backup-row__icon"><Icon name="download" size={17} /></span>
-                  <div className="backup-row__info">
-                    <strong>{backup.filename}</strong>
-                    <span>
-                      {bytes(backup.sizeBytes)} · {formatDateTime(backup.createdAt)}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className="link-button"
-                    onClick={() => downloadBackup(backup.filename)}
-                  >
-                    Baixar
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-          <p className="muted small">
-            Automático todos os dias às {String(system?.backupHour ?? 3).padStart(2, '0')}:00 · retenção de{' '}
-            {system?.backupRetentionDays ?? 30} dias. Restaure com o servidor parado, trocando{' '}
-            <code>backend/data/drift.db</code> pelo arquivo do backup.
-          </p>
-        </section>
-
-        <section className="settings-card">
-          <header className="settings-card__head">
             <span className="settings-card__icon"><Icon name="wifi" size={20} /></span>
             <div>
               <h2>Rede local</h2>
@@ -444,7 +377,7 @@ export function SettingsPage() {
         <Icon name="lock" size={17} />
         <p>
           O app não usa internet nem serviços externos. Fotos ficam em{' '}
-          <code>backend/uploads</code> e os backups em <code>backend/backups</code>.
+          <code>backend/uploads</code>. Backups do banco ficam no servidor (veja README).
         </p>
       </div>
 

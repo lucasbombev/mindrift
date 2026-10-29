@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useToast } from '../context/ToastContext.jsx';
-import { addDaysKey, brl, formatDate, formatDateTime, paymentLabel, toDateKey } from '../lib/format.js';
+import { addDaysKey, brl, clientName, formatDate, formatDateTime, paymentLabel, toDateKey } from '../lib/format.js';
 import {
   Badge,
   Button,
@@ -341,7 +341,7 @@ export function CashPage() {
                   {summary.pagamentos.map((payment) => (
                     <div key={payment.id} className="cash-payment">
                       <div>
-                        <strong>{payment.clienteNome}</strong>
+                        <strong>{clientName(payment.clienteNome)}</strong>
                         <span>
                           {payment.tipo === 'adiantado' ? 'Adiantado' : 'Parcela final'} ·{' '}
                           {paymentLabel(payment.formaPagamento)} · {payment.operadorNome}
@@ -370,7 +370,7 @@ export function CashPage() {
                   {summary.pendentes.itens.map((pending) => (
                     <div key={pending.id} className="cash-payment">
                       <div>
-                        <strong>{pending.clienteNome}</strong>
+                        <strong>{clientName(pending.clienteNome)}</strong>
                         <span>
                           {pending.cartCodigo} · {pending.operadorNome} · {formatDateTime(pending.encerradoEm)}
                           {pending.valorAdiantadoCentavos > 0

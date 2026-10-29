@@ -59,6 +59,13 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
+  const signup = useCallback(async (payload) => {
+    const data = await api.post('/public/signup', payload);
+    setAccessToken(data.accessToken);
+    setUser(data.user);
+    return data;
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
@@ -90,13 +97,15 @@ export function AuthProvider({ children }) {
       loading,
       bootError,
       login,
+      signup,
       logout,
       changePassword,
       refreshUser,
       retryBoot: boot,
       isAdmin: user?.role === 'admin',
+      isSuperadmin: user?.role === 'superadmin',
     }),
-    [user, loading, bootError, login, logout, changePassword, refreshUser, boot],
+    [user, loading, bootError, login, signup, logout, changePassword, refreshUser, boot],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

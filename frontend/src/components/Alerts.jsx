@@ -1,6 +1,6 @@
 import { Button, IconButton } from './ui.jsx';
 import { Icon } from './Icons.jsx';
-import { formatCountdown, formatDuration } from '../lib/format.js';
+import { clientName, formatCountdown, formatDuration } from '../lib/format.js';
 
 export function LeadAlertBanner({ alerts, now, onAcknowledge }) {
   if (!alerts.length) return null;
@@ -16,7 +16,7 @@ export function LeadAlertBanner({ alerts, now, onAcknowledge }) {
             const remaining = new Date(alert.session.fimPrevistoEm).getTime() - now;
             return (
               <span key={alert.key} className="lead-alert__item">
-                <strong>{alert.session.cartCodigo}</strong> {alert.session.clienteNome}
+                <strong>{alert.session.cartCodigo}</strong> {clientName(alert.session.clienteNome)}
                 <em>{formatCountdown(Math.max(0, remaining)).text}</em>
               </span>
             );
@@ -53,7 +53,7 @@ export function ExpiredAlertsOverlay({ alerts, now, onAcknowledge, onAcknowledge
                 <div className="alarm-item__info">
                   <span className="alarm-item__cart">{alert.session.cartCodigo}</span>
                   <div>
-                    <strong>{alert.session.clienteNome}</strong>
+                    <strong>{clientName(alert.session.clienteNome)}</strong>
                     <span className="alarm-item__time">
                       +{formatDuration(over / 1000)} de excedente
                     </span>

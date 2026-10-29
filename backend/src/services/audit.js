@@ -1,22 +1,29 @@
 import { nowIso } from '../utils/time.js';
 
-export function logEvent(db, sessionId, tipo, usuarioId, payload = null) {
+export function logEvent(db, tenantId, sessionId, tipo, usuarioId, payload = null) {
   db.prepare(
-    `INSERT INTO session_events (session_id, tipo, payload_json, usuario_id, criado_em)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(sessionId, tipo, payload ? JSON.stringify(payload) : null, usuarioId ?? null, nowIso());
+    `INSERT INTO session_events (tenant_id, session_id, tipo, payload_json, usuario_id, criado_em)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(
+    tenantId,
+    sessionId,
+    tipo,
+    payload ? JSON.stringify(payload) : null,
+    usuarioId ?? null,
+    nowIso(),
+  );
 }
 
-export function listSessionEvents(db, sessionId) {
+export function listSessionEvents(db, tenantId, sessionId) {
   return db
     .prepare(
       `SELECT e.id, e.tipo, e.payload_json, e.criado_em, e.usuario_id, u.nome AS usuario_nome
        FROM session_events e
        LEFT JOIN users u ON u.id = e.usuario_id
-       WHERE e.session_id = ?
+       WHERE e.tenant_id = ? AND e.session_id = ?
        ORDER BY e.id ASC`,
     )
-    .all(sessionId)
+    .all(tenantId, sessionId)
     .map((row) => ({
       id: row.id,
       tipo: row.tipo,

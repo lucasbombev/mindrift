@@ -50,6 +50,32 @@ const paths = {
       <circle cx="9" cy="17" r="2" />
     </>
   ),
+  keyboard: (
+    <>
+      <rect x="2.5" y="6" width="19" height="12" rx="2.5" />
+      <path d="M6 10h.01M9 10h.01M12 10h.01M15 10h.01M18 10h.01M7 14h10" />
+    </>
+  ),
+  qr: (
+    <>
+      <rect x="3" y="3" width="6" height="6" rx="1" />
+      <rect x="15" y="3" width="6" height="6" rx="1" />
+      <rect x="3" y="15" width="6" height="6" rx="1" />
+      <path d="M15 15h3v3h-3zM21 15v2M18 21h3M15 21h.01" />
+    </>
+  ),
+  scan: (
+    <>
+      <path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" />
+      <path d="M4 12h16" />
+    </>
+  ),
+  tag: (
+    <>
+      <path d="M3 12V4h8l9 9-8 8-9-9Z" />
+      <circle cx="7.5" cy="8.5" r="1.2" />
+    </>
+  ),
   more: (
     <>
       <circle cx="5" cy="12" r="1" fill="currentColor" />

@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import {
   addDaysKey,
   brl,
+  clientName,
   formatDateTime,
   formatDuration,
   humanRelativeDate,
@@ -29,6 +30,7 @@ import {
 import { Icon } from '../components/Icons.jsx';
 import {
   CancelSessionModal,
+  EditClientModal,
   PaymentModal,
   SessionDetailsModal,
   ValueModal,
@@ -368,7 +370,7 @@ export function HistoryPage() {
                     <span className="session-row__cart-label">carrinho</span>
                   </div>
                   <div className="session-row__client">
-                    <strong>{session.clienteNome}</strong>
+                    <strong>{clientName(session.clienteNome)}</strong>
                     <span>
                       {session.minutosContratados} min contratados
                       {session.duracaoSegundos ? ` · real ${formatDuration(session.duracaoSegundos)}` : ''}
@@ -397,7 +399,7 @@ export function HistoryPage() {
                   </div>
                   <IconButton
                     icon="more"
-                    label={`Ações da sessão de ${session.clienteNome}`}
+                    label={`Ações da sessão de ${clientName(session.clienteNome)}`}
                     onClick={() => setActionSession(session)}
                   />
                 </div>
@@ -440,7 +442,7 @@ export function HistoryPage() {
       <Modal
         open={Boolean(actionSession)}
         onClose={() => setActionSession(null)}
-        title={actionSession ? `${actionSession.cartCodigo} · ${actionSession.clienteNome}` : ''}
+        title={actionSession ? `${actionSession.cartCodigo} · ${clientName(actionSession.clienteNome)}` : ''}
         subtitle={actionSession ? `${formatDateTime(actionSession.iniciadoEm)} · ${brl(actionSession.valorCentavos)}` : ''}
         icon="more"
         size="sm"
@@ -460,6 +462,23 @@ export function HistoryPage() {
               <span>
                 <strong>Ver detalhes</strong>
                 <small>Tempos, pagamento e auditoria</small>
+              </span>
+              <Icon name="chevronRight" size={18} />
+            </button>
+
+            <button
+              type="button"
+              className="action-list__item"
+              onClick={() => {
+                const current = actionSession;
+                setActionSession(null);
+                setModal({ type: 'client', session: current });
+              }}
+            >
+              <span className="action-list__icon"><Icon name="user" size={20} /></span>
+              <span>
+                <strong>Editar nome do cliente</strong>
+                <small>Útil quando o cliente se identifica depois</small>
               </span>
               <Icon name="chevronRight" size={18} />
             </button>
@@ -551,6 +570,14 @@ export function HistoryPage() {
       {modal?.type === 'details' && (
         <SessionDetailsModal open sessionId={modal.session.id} onClose={() => setModal(null)} />
       )}
+      {modal?.type === 'client' && (
+        <EditClientModal
+          open
+          session={modal.session}
+          onClose={() => setModal(null)}
+          onSuccess={() => refreshAfter('Nome do cliente atualizado.')}
+        />
+      )}
       {modal?.type === 'payment' && (
         <PaymentModal
           open
@@ -585,7 +612,7 @@ export function HistoryPage() {
         title="Excluir do histórico?"
         message={
           modal?.session
-            ? `A sessão de ${modal.session.clienteNome} (${brl(modal.session.valorCentavos)}) será removida das listas e relatórios. A auditoria fica preservada no banco, mas não aparece mais no app.`
+            ? `A sessão de ${clientName(modal.session.clienteNome)} (${brl(modal.session.valorCentavos)}) será removida das listas e relatórios. A auditoria fica preservada no banco, mas não aparece mais no app.`
             : ''
         }
         confirmLabel="Excluir sessão"

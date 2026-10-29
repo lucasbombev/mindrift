@@ -46,8 +46,12 @@ io.attach(httpServer);
 if (httpsServer) io.attach(httpsServer);
 
 app.locals.io = io;
-app.locals.broadcast = () => {
-  io.emit('dashboard', getDashboard(db));
+app.locals.broadcast = (tenantId) => {
+  if (!tenantId) return;
+  io.to(`tenant:${tenantId}`).emit('dashboard', getDashboard(db, tenantId));
+};
+app.locals.disconnectTenant = (tenantId) => {
+  io.in(`tenant:${tenantId}`).disconnectSockets(true);
 };
 
 io.use((socket, next) => {
@@ -68,6 +72,11 @@ io.use((socket, next) => {
       err.data = { codigo: 'senha_troca_obrigatoria' };
       return next(err);
     }
+    if (user.role === 'superadmin' || !user.tenantId) {
+      const err = new Error('Superadmin não acessa o painel operacional');
+      err.data = { codigo: 'superadmin_sem_tenant' };
+      return next(err);
+    }
     socket.data.user = user;
     next();
   } catch (err) {
@@ -78,11 +87,13 @@ io.use((socket, next) => {
 });
 
 io.on('connection', (socket) => {
-  socket.join('operadores');
-  socket.emit('dashboard', getDashboard(db));
+  const user = socket.data.user;
+  socket.join(`tenant:${user.tenantId}`);
+  socket.emit('dashboard', getDashboard(db, user.tenantId));
   socket.emit('hello', {
     serverNow: Date.now(),
-    usuario: socket.data.user?.nome,
+    usuario: user.nome,
+    tenantId: user.tenantId,
   });
 });
 
@@ -93,13 +104,15 @@ const tick = setInterval(() => {
 const notified = new Set();
 const expireCheck = setInterval(() => {
   const now = Date.now();
-  const leadSeconds = Number(getSetting(db, 'alert_lead_seconds', '60')) || 0;
   let active = [];
   try {
     active = db
       .prepare(
-        `SELECT s.id, s.fim_previsto_em, s.cliente_nome, c.codigo AS cart_codigo
-         FROM sessions s JOIN carts c ON c.id = s.cart_id
+        `SELECT s.id, s.tenant_id, s.fim_previsto_em, s.cliente_nome,
+                c.codigo AS cart_codigo, t.ativo AS tenant_ativo
+         FROM sessions s
+         JOIN carts c ON c.id = s.cart_id
+         JOIN tenants t ON t.id = s.tenant_id
          WHERE s.status = 'em_andamento' AND s.excluida_em IS NULL`,
       )
       .all();
@@ -108,16 +121,25 @@ const expireCheck = setInterval(() => {
     return;
   }
   const validKeys = new Set();
+  const leadByTenant = new Map();
   for (const session of active) {
+    if (!session.tenant_ativo) continue;
+    if (!leadByTenant.has(session.tenant_id)) {
+      leadByTenant.set(
+        session.tenant_id,
+        Number(getSetting(db, session.tenant_id, 'alert_lead_seconds', '60')) || 0,
+      );
+    }
+    const leadSeconds = leadByTenant.get(session.tenant_id);
     const endsAt = new Date(session.fim_previsto_em).getTime();
-    const endKey = `fim:${session.id}:${session.fim_previsto_em}`;
-    const leadKey = `aviso:${session.id}:${session.fim_previsto_em}`;
+    const endKey = `fim:${session.tenant_id}:${session.id}:${session.fim_previsto_em}`;
+    const leadKey = `aviso:${session.tenant_id}:${session.id}:${session.fim_previsto_em}`;
     validKeys.add(endKey);
     validKeys.add(leadKey);
     const remaining = endsAt - now;
     if (remaining <= 0 && !notified.has(endKey)) {
       notified.add(endKey);
-      io.emit('session:expired', {
+      io.to(`tenant:${session.tenant_id}`).emit('session:expired', {
         id: session.id,
         clienteNome: session.cliente_nome,
         cartCodigo: session.cart_codigo,
@@ -126,7 +148,7 @@ const expireCheck = setInterval(() => {
       });
     } else if (remaining > 0 && remaining <= leadSeconds * 1000 && !notified.has(leadKey)) {
       notified.add(leadKey);
-      io.emit('session:expiring', {
+      io.to(`tenant:${session.tenant_id}`).emit('session:expiring', {
         id: session.id,
         clienteNome: session.cliente_nome,
         cartCodigo: session.cart_codigo,

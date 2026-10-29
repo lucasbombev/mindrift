@@ -3,10 +3,24 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 import { unauthorized } from '../utils/errors.js';
 
+export const USER_WITH_TENANT_SELECT = `
+  SELECT u.*, t.nome AS tenant_nome, t.slug AS tenant_slug, t.ativo AS tenant_ativo
+  FROM users u
+  LEFT JOIN tenants t ON t.id = u.tenant_id
+`;
+
+export function getUserWithTenant(db, id) {
+  return db.prepare(`${USER_WITH_TENANT_SELECT} WHERE u.id = ?`).get(id);
+}
+
 export function publicUser(row) {
   if (!row) return null;
   return {
     id: row.id,
+    tenantId: row.tenant_id ?? null,
+    tenantName: row.tenant_nome || null,
+    tenantSlug: row.tenant_slug || null,
+    tenantAtivo: row.tenant_ativo === undefined ? null : Boolean(row.tenant_ativo),
     nome: row.nome,
     username: row.username,
     email: row.email || null,

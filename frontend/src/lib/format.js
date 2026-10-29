@@ -149,7 +149,13 @@ export function statusLabel(status) {
   );
 }
 
+export function clientName(value) {
+  const name = String(value || '').trim();
+  return name || 'Cliente não informado';
+}
+
 export function roleLabel(role) {
+  if (role === 'superadmin') return 'Superadmin';
   return role === 'admin' ? 'Administrador' : 'Operador';
 }
 

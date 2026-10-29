@@ -10,10 +10,12 @@ import { promptInstall } from '../lib/pwa.js';
 import { roleLabel } from '../lib/format.js';
 
 const ADMIN_LINKS = [
-  { to: '/carrinhos', label: 'Carrinhos', icon: 'cart', desc: 'Fotos, status e cadastro' },
-  { to: '/planos', label: 'Planos', icon: 'timer', desc: 'Tempos e valores' },
+  { to: '/carrinhos', label: 'Carrinhos', icon: 'cart', desc: 'Fotos, categorias e status' },
+  { to: '/categorias', label: 'Categorias', icon: 'tag', desc: 'Drift, kart, patinete e mais' },
+  { to: '/planos', label: 'Planos', icon: 'timer', desc: 'Tempos, valores e categorias' },
+  { to: '/qrcodes', label: 'QR Codes', icon: 'qr', desc: 'Imprimir etiquetas da frota' },
   { to: '/usuarios', label: 'Usuários', icon: 'users', desc: 'Operadores e permissões' },
-  { to: '/configuracoes', label: 'Ajustes', icon: 'settings', desc: 'Som, backups e rede' },
+  { to: '/configuracoes', label: 'Ajustes', icon: 'settings', desc: 'Som, negócio e rede' },
 ];
 
 export function AppLayout() {
@@ -32,12 +34,14 @@ export function AppLayout() {
   const mainLinks = isAdmin
     ? [
         { to: '/', label: 'Início', icon: 'home', end: true },
+        { to: '/scan', label: 'Escanear', icon: 'scan' },
         { to: '/historico', label: 'Histórico', icon: 'history' },
         { to: '/relatorios', label: 'Relatórios', icon: 'chart' },
         { to: '/caixa', label: 'Caixa', icon: 'cash' },
       ]
     : [
         { to: '/', label: 'Início', icon: 'home', end: true },
+        { to: '/scan', label: 'Escanear', icon: 'scan' },
         { to: '/historico', label: 'Histórico', icon: 'history' },
       ];
 
@@ -136,7 +140,7 @@ export function AppLayout() {
         open={moreOpen}
         onClose={() => setMoreOpen(false)}
         title="Mais opções"
-        subtitle={`${user?.nome} · ${roleLabel(user?.role)}`}
+        subtitle={`${user?.nome} · ${roleLabel(user?.role)}${user?.tenantName ? ` · ${user.tenantName}` : ''}`}
         icon="menu"
         size="sm"
       >

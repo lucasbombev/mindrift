@@ -15,7 +15,7 @@ export function getLanUrls(port = config.port) {
   return [...new Set(urls)];
 }
 
-export function getSystemInfo(db) {
+export function getSystemInfo(db, tenantId) {
   let dbSize = 0;
   try {
     dbSize = fs.statSync(config.dbPath).size;
@@ -23,9 +23,15 @@ export function getSystemInfo(db) {
     dbSize = 0;
   }
   const counts = {
-    carrinhos: db.prepare('SELECT COUNT(*) AS n FROM carts WHERE excluido_em IS NULL').get().n,
-    usuarios: db.prepare('SELECT COUNT(*) AS n FROM users WHERE ativo = 1').get().n,
-    sessoes: db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE excluida_em IS NULL').get().n,
+    carrinhos: db
+      .prepare('SELECT COUNT(*) AS n FROM carts WHERE tenant_id = ? AND excluido_em IS NULL')
+      .get(tenantId).n,
+    usuarios: db
+      .prepare('SELECT COUNT(*) AS n FROM users WHERE tenant_id = ? AND ativo = 1')
+      .get(tenantId).n,
+    sessoes: db
+      .prepare('SELECT COUNT(*) AS n FROM sessions WHERE tenant_id = ? AND excluida_em IS NULL')
+      .get(tenantId).n,
   };
   return {
     versao: config.version,

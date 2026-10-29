@@ -30,28 +30,38 @@ const updateSchema = z.object({
   ativo: z.boolean().optional(),
 });
 
-function activeAdminCount(db) {
+function activeAdminCount(db, tenantId) {
   return db
-    .prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND ativo = 1")
-    .get().n;
+    .prepare("SELECT COUNT(*) AS n FROM users WHERE tenant_id = ? AND role = 'admin' AND ativo = 1")
+    .get(tenantId).n;
 }
 
-function getUser(db, id) {
-  return db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+function getUser(db, tenantId, id) {
+  return db.prepare('SELECT * FROM users WHERE id = ? AND tenant_id = ?').get(id, tenantId);
+}
+
+function assertEmailFree(db, email, ignoreId = 0) {
+  if (!email) return;
+  const found = db
+    .prepare('SELECT id FROM users WHERE email IS NOT NULL AND lower(email) = lower(?) AND id != ?')
+    .get(email, ignoreId);
+  if (found) throw conflict('Este e-mail já está cadastrado.');
 }
 
 export function createUsersRouter(db) {
   const router = Router();
   router.use(requireAdmin);
 
-  router.get('/', (_req, res) => {
-    const rows = db.prepare('SELECT * FROM users ORDER BY ativo DESC, nome COLLATE NOCASE').all();
+  router.get('/', (req, res) => {
+    const rows = db
+      .prepare('SELECT * FROM users WHERE tenant_id = ? ORDER BY ativo DESC, nome COLLATE NOCASE')
+      .all(req.tenantId);
     res.json({ items: rows.map(publicUser) });
   });
 
   router.get('/:id', (req, res, next) => {
     try {
-      const row = getUser(db, Number(req.params.id));
+      const row = getUser(db, req.tenantId, Number(req.params.id));
       if (!row) throw notFound('Usuário não encontrado.');
       res.json({ item: publicUser(row) });
     } catch (err) {
@@ -67,15 +77,17 @@ export function createUsersRouter(db) {
         .prepare('SELECT id FROM users WHERE username = ? COLLATE NOCASE')
         .get(body.username);
       if (exists) throw conflict('Este nome de usuário já está em uso.');
+      if (body.email) assertEmailFree(db, body.email.toLowerCase());
       const hash = await hashPassword(body.senha);
       const now = nowIso();
       const info = db
         .prepare(
-          `INSERT INTO users (nome, username, email, senha_hash, role, ativo,
+          `INSERT INTO users (tenant_id, nome, username, email, senha_hash, role, ativo,
              must_change_password, token_version, criado_em, atualizado_em)
-           VALUES (?, ?, ?, ?, ?, 1, 1, 1, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, 1, 1, 1, ?, ?)`,
         )
         .run(
+          req.tenantId,
           body.nome,
           body.username,
           body.email ? body.email.toLowerCase() : null,
@@ -84,7 +96,7 @@ export function createUsersRouter(db) {
           now,
           now,
         );
-      const row = getUser(db, Number(info.lastInsertRowid));
+      const row = getUser(db, req.tenantId, Number(info.lastInsertRowid));
       res.status(201).json({ item: publicUser(row) });
     } catch (err) {
       next(err);
@@ -94,17 +106,17 @@ export function createUsersRouter(db) {
   router.patch('/:id', async (req, res, next) => {
     try {
       const id = Number(req.params.id);
-      const row = getUser(db, id);
+      const row = getUser(db, req.tenantId, id);
       if (!row) throw notFound('Usuário não encontrado.');
       const body = updateSchema.parse(req.body);
 
       if (body.ativo === false && id === req.user.id) {
         throw badRequest('Você não pode desativar a própria conta.');
       }
-      if (body.ativo === false && row.role === 'admin' && row.ativo && activeAdminCount(db) <= 1) {
+      if (body.ativo === false && row.role === 'admin' && row.ativo && activeAdminCount(db, req.tenantId) <= 1) {
         throw conflict('Não é possível desativar o último administrador ativo.');
       }
-      if (body.role === 'operador' && row.role === 'admin' && row.ativo && activeAdminCount(db) <= 1) {
+      if (body.role === 'operador' && row.role === 'admin' && row.ativo && activeAdminCount(db, req.tenantId) <= 1) {
         throw conflict('Não é possível rebaixar o último administrador ativo.');
       }
       if (body.username && body.username !== row.username) {
@@ -113,6 +125,7 @@ export function createUsersRouter(db) {
           .get(body.username, id);
         if (exists) throw conflict('Este nome de usuário já está em uso.');
       }
+      if (body.email !== undefined) assertEmailFree(db, body.email ? body.email.toLowerCase() : null, id);
       if (body.senha) {
         validateNewPassword(body.senha, '', body.username || row.username);
       }
@@ -140,8 +153,12 @@ export function createUsersRouter(db) {
       if (!fields.length) return res.json({ item: publicUser(row) });
 
       push('atualizado_em = ?', nowIso());
-      db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...params, id);
-      const fresh = getUser(db, id);
+      db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ? AND tenant_id = ?`).run(
+        ...params,
+        id,
+        req.tenantId,
+      );
+      const fresh = getUser(db, req.tenantId, id);
       res.json({ item: publicUser(fresh) });
     } catch (err) {
       next(err);
@@ -151,17 +168,17 @@ export function createUsersRouter(db) {
   router.delete('/:id', (req, res, next) => {
     try {
       const id = Number(req.params.id);
-      const row = getUser(db, id);
+      const row = getUser(db, req.tenantId, id);
       if (!row) throw notFound('Usuário não encontrado.');
       if (id === req.user.id) throw badRequest('Você não pode desativar a própria conta.');
-      if (row.role === 'admin' && row.ativo && activeAdminCount(db) <= 1) {
+      if (row.role === 'admin' && row.ativo && activeAdminCount(db, req.tenantId) <= 1) {
         throw conflict('Não é possível desativar o último administrador ativo.');
       }
       db.prepare(
         `UPDATE users SET ativo = 0, token_version = token_version + 1,
-         atualizado_em = ? WHERE id = ?`,
-      ).run(nowIso(), id);
-      res.json({ item: publicUser(getUser(db, id)) });
+         atualizado_em = ? WHERE id = ? AND tenant_id = ?`,
+      ).run(nowIso(), id, req.tenantId);
+      res.json({ item: publicUser(getUser(db, req.tenantId, id)) });
     } catch (err) {
       next(err);
     }

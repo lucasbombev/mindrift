@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Button, InlineError } from '../components/ui.jsx';
 import { Icon, Logo } from '../components/Icons.jsx';
@@ -66,7 +67,7 @@ export function LoginPage() {
             </span>
             <div>
               <h2>Acessar o painel</h2>
-              <p>Entre com o usuário do operador ou administrador.</p>
+              <p>Entre com o usuário ou e-mail do operador, administrador ou superadmin.</p>
             </div>
           </div>
 
@@ -74,7 +75,7 @@ export function LoginPage() {
             <InlineError>{error}</InlineError>
             <div className="field">
               <label className="field__label" htmlFor="username">
-                Usuário
+                Usuário ou e-mail
               </label>
               <input
                 id="username"
@@ -86,7 +87,7 @@ export function LoginPage() {
                 autoComplete="username"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
-                placeholder="ex.: admin"
+                placeholder="ex.: admin ou seu@email.com"
                 autoFocus
               />
             </div>
@@ -119,9 +120,9 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="login-card__footer">
-            <Icon name="wifi" size={16} />
-            <span>Acesso pela rede Wi-Fi local · v1.0</span>
+          <div className="login-card__footer login-card__footer--split">
+            <Link to="/cadastro">Criar meu negócio</Link>
+            <span className="muted small">Ambiente isolado por negócio</span>
           </div>
         </section>
       </div>

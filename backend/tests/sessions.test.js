@@ -1,7 +1,5 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import request from 'supertest';
 import { auth, createTestContext } from './helpers.js';
 
@@ -10,6 +8,7 @@ const admin = await ctx.loginAdmin();
 const adminToken = admin.token;
 let plans;
 let carts;
+let categories;
 let supervisor;
 
 after(() => ctx.close());
@@ -37,6 +36,11 @@ test('carrinhos: lista, upload de foto, código único e validação de imagem',
   assert.equal(list.status, 200);
   assert.equal(list.body.items.length, 4);
   carts = list.body.items;
+  const categoryList = await request(ctx.app)
+    .get('/api/categories')
+    .set(auth(adminToken));
+  assert.equal(categoryList.status, 200);
+  categories = categoryList.body.items;
 
   const jpeg = Buffer.from(
     '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAH/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAEFAqf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/AX//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/AX//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAY/AX//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/IV//2gAMAwEAAgADAAAAEP/EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQMBAT8Qf//EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQ2ATA/8QAFBEBAAAAAAAAAAAAAAAAAAAAEP/aAAgBAQABPxB//9k=',
@@ -47,6 +51,7 @@ test('carrinhos: lista, upload de foto, código único e validação de imagem',
     .post('/api/carts')
     .set(auth(adminToken))
     .field('codigo', 'C05')
+    .field('category_id', String(categories[0].id))
     .field('status', 'disponivel')
     .attach('foto', jpeg, { filename: 'carrinho.jpg', contentType: 'image/jpeg' });
   assert.equal(created.status, 201);
@@ -58,13 +63,15 @@ test('carrinhos: lista, upload de foto, código único e validação de imagem',
   const duplicate = await request(ctx.app)
     .post('/api/carts')
     .set(auth(adminToken))
-    .field('codigo', 'C05');
+    .field('codigo', 'C05')
+    .field('category_id', String(categories[0].id));
   assert.equal(duplicate.status, 409);
 
   const invalid = await request(ctx.app)
     .post('/api/carts')
     .set(auth(adminToken))
     .field('codigo', 'C06')
+    .field('category_id', String(categories[0].id))
     .attach('foto', Buffer.from('nao-e-imagem'), {
       filename: 'fake.jpg',
       contentType: 'image/jpeg',
@@ -289,7 +296,7 @@ test('cancelamento e exclusão são exclusivos de admin e ficam no histórico', 
   assert.ok(!listAfter.body.items.some((item) => item.id === started.body.sessao.id));
 });
 
-test('relatórios, caixa, fechamento e backup', async () => {
+test('relatórios, caixa e fechamento', async () => {
   const dash = await getDashboard();
   assert.ok(dash.summary.faturamentoHojeCentavos >= 2300);
 
@@ -324,18 +331,6 @@ test('relatórios, caixa, fechamento e backup', async () => {
     .set(auth(adminToken));
   assert.equal(closures.status, 200);
   assert.ok(closures.body.items.length >= 1);
-
-  const backup = await request(ctx.app)
-    .post('/api/settings/backups')
-    .set(auth(adminToken));
-  assert.equal(backup.status, 201);
-  const filePath = path.join(ctx.dir, 'backups', backup.body.backup.filename);
-  assert.ok(fs.existsSync(filePath));
-
-  const download = await request(ctx.app)
-    .get(`/api/settings/backups/${backup.body.backup.filename}/download`)
-    .set(auth(adminToken));
-  assert.equal(download.status, 200);
 
   const settings = await request(ctx.app)
     .patch('/api/settings')

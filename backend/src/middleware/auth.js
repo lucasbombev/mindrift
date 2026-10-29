@@ -1,5 +1,9 @@
 import { forbidden, unauthorized } from '../utils/errors.js';
-import { publicUser, verifyAccessToken } from '../services/auth.js';
+import {
+  getUserWithTenant,
+  publicUser,
+  verifyAccessToken,
+} from '../services/auth.js';
 
 const PENDING_PASSWORD_ALLOWED = new Set([
   'GET /api/auth/me',
@@ -16,10 +20,15 @@ function readBearer(req) {
 
 export function authenticateToken(db, token) {
   const payload = verifyAccessToken(token);
-  const row = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(payload.sub));
+  const row = getUserWithTenant(db, Number(payload.sub));
   if (!row || !row.ativo) throw unauthorized('Usuário inativo ou removido.');
   if (Number(payload.tv) !== Number(row.token_version)) {
     throw unauthorized('Sessão encerrada. Entre novamente.');
+  }
+  if (row.role !== 'superadmin') {
+    if (!row.tenant_id || !row.tenant_ativo) {
+      throw forbidden('Negócio inativo ou indisponível.', 'negocio_inativo');
+    }
   }
   return publicUser(row);
 }
@@ -31,6 +40,7 @@ export function requireAuth(db) {
       if (!token) throw unauthorized('Faça login para continuar.');
       const user = authenticateToken(db, token);
       req.user = user;
+      req.tenantId = user.tenantId ?? null;
 
       if (
         user.mustChangePassword &&
@@ -48,9 +58,30 @@ export function requireAuth(db) {
   };
 }
 
+/** Bloqueia superadmin e garante que a rota é de um tenant. */
+export function requireTenant(req, _res, next) {
+  if (!req.user) return next(unauthorized());
+  if (req.user.role === 'superadmin' || !req.tenantId) {
+    return next(
+      forbidden(
+        'Esta área é exclusiva dos negócios. Superadmin usa apenas o painel /superadmin.',
+        'superadmin_sem_tenant',
+      ),
+    );
+  }
+  next();
+}
+
 export function requireAdmin(req, _res, next) {
   if (!req.user || req.user.role !== 'admin') {
     return next(forbidden('Apenas administradores podem acessar este recurso.'));
+  }
+  next();
+}
+
+export function requireSuperadmin(req, _res, next) {
+  if (!req.user || req.user.role !== 'superadmin') {
+    return next(forbidden('Apenas o superadmin pode acessar este recurso.'));
   }
   next();
 }

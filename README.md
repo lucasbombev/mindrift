@@ -1,591 +1,446 @@
 # 🏁 Drift Rent
 
-Sistema completo para alugar carrinhos de drift por tempo em uma praça. Um notebook
-na pista roda o **servidor + banco**; operadores e o dono usam **celulares pelo navegador
-ou PWA**, na mesma rede Wi-Fi. Não precisa de internet, CDN, conta em nuvem ou chave de API.
+SaaS local (LAN/Tailscale) para alugar carrinhos de drift, kart, patinete, quadriciclo e outras
+categorias por tempo. O notebook da pista roda **servidor + SQLite**; operadores e administradores
+usam **celular pelo navegador ou PWA**. Não há CDN, serviço pago ou dependência de nuvem.
 
-- **Backend:** Node.js + Express + SQLite (`better-sqlite3`) + Socket.IO
-- **Frontend:** React + Vite, mobile-first, PWA via `vite-plugin-pwa`, instalável por HTTPS
-- **Acesso externo:** HTTPS confiável do Tailscale (`tailscale serve`)
-- **Tempo real:** timer autoritativo no servidor, sincronizado por WebSocket
-- **Autenticação:** JWT + refresh cookie + **bcrypt** (`bcryptjs`) + rate-limit
-- **Fotos:** upload no disco em `backend/uploads`, servidas por `/uploads`
-- **Pagamento:** no início (adiantado) ou no encerramento, com controle de restante após renovação
-- **Backup:** cópia automática diária em `backend/backups`
-- **Português do Brasil** em toda a interface
+A versão atual é **multi-tenant**: cada negócio tem sua própria frota, usuários, categorias, planos,
+sessões, caixa e configurações. Um administrador **nunca** acessa dados de outro negócio.
 
-> Valores monetários são armazenados em **centavos** (inteiros) para não haver erro de
-> arredondamento. Datas são gravadas em UTC e exibidas no fuso configurado.
+## O que há de novo
+
+- **Multi-tenant** com signup público, isolamento por `tenant_id` e superadmin separado.
+- **Categorias** por negócio (Drift, Kart, Patinete, Quadriciclo + novas categorias).
+- **QR Code** por carrinho com impressão de etiquetas 5 × 5 cm, PDF A4 e leitura pela câmera.
+- **Check-in/check-out visual**: encerrar escolhendo o destino do equipamento em 1 toque.
+- **Cliente opcional**, editável depois, com relatórios agrupando “Sem identificação”.
 
 ---
 
 ## 1. Início rápido (notebook servidor)
 
-Pré-requisitos: **Node.js 22.12+** (recomendado Node 24 LTS) e npm.
+Requisitos: **Node.js >= 22.12** (recomendado Node 24), npm e um notebook na mesma rede dos
+celulares (ou na tailnet do Tailscale).
 
 ```bash
-cd DriftApp
-npm install       # só na primeira vez; precisa de internet apenas aqui
+cd /home/lucas/Documents/DriftApp
+npm install
 npm start
 ```
 
-Também é possível rodar somente `npm start` na primeira vez: ele instala dependências
-ausentes, cria o `backend/.env` com segredos aleatórios, compila o frontend se necessário,
-cria o banco e sobe tudo. O comando mantém um supervisor: se o processo do servidor cair
-por algum motivo inesperado, ele é reiniciado em 1,5 s e os timers continuam no SQLite.
+O `npm start`:
 
-No terminal aparecerá algo assim:
+1. confere/gera `backend/.env` e segredos;
+2. aplica a migração pendente com backup automático;
+3. cria o superadmin na primeira execução;
+4. builda o frontend quando necessário;
+5. sobe o Express + Socket.IO na porta **3000** e, se houver certificado local, HTTPS em **3443**.
 
-```
-🏁 Drift Rent — servidor no ar
+Saída esperada:
+
+```text
 Local:   http://localhost:3000
-Rede:    http://192.168.1.50:3000
-Fuso:    America/Fortaleza
-Banco:   .../backend/data/drift.db
-Backup:  .../backend/backups
-
-Primeiro acesso: admin / admin123 / Lucas$99
-A troca de senha será exigida no login.
+Rede:    http://192.168.x.x:3000
+Banco:   backend/data/drift.db
 ```
 
-1. No notebook, abra `http://localhost:3000`.
-2. Entre com **admin / admin123**. / Lucas$99
-3. O sistema exige a criação de uma nova senha no primeiro acesso. Anote-a.
-4. Nos celulares, abra `http://IP-DO-NOTEBOOK:3000` na mesma Wi-Fi.
-5. Crie os operadores em **Mais → Usuários** (cada um também troca a senha no 1º login).
+### Credenciais
 
-O servidor escuta em `0.0.0.0:3000`, portanto aceita conexões de outros aparelhos da LAN.
+| Conta | Quando existe | Senha inicial |
+|---|---|---|
+| `admin` | banco novo | `admin123` (troca obrigatória) |
+| admin existente | banco já em uso | sua senha atual, preservada na migração |
+| `superadmin` | criado no primeiro seed | `superadmin123` (troca obrigatória) |
 
-> **Deixando o notebook como servidor:** desative a suspensão automática, mantenha-o na
-> tomada e não feche o terminal. Para uso em quiosque, abra o Chrome em modo kiosk:
-> `google-chrome --kiosk http://localhost:3000`. Se quiser iniciar junto com o sistema,
-> crie um serviço systemd/Tarefa Agendada chamando `npm start` na pasta do projeto.
+> **Troque a senha do superadmin imediatamente.** Em produção, defina
+> `SUPERADMIN_USERNAME`, `SUPERADMIN_PASSWORD`, `SUPERADMIN_NAME` e `SUPERADMIN_EMAIL` no
+> `backend/.env` **antes** do primeiro start. Depois de criado, alterar o `.env` não muda a senha;
+> use a tela de troca de senha.
 
 ### Descobrir o IP do notebook
 
-- **Windows:** `ipconfig` → “Endereço IPv4” do adaptador Wi-Fi (ex.: `192.168.1.50`).
-- **Linux:** `ip addr` ou `hostname -I`.
-- **macOS:** `ipconfig getifaddr en0`.
-- O próprio painel mostra os endereços em **Ajustes → Rede local**.
-
-Se o celular não abrir, verifique:
-
-- notebook e celular na **mesma rede** (não use “rede de visitantes”);
-- firewall do notebook liberando a porta **3000** (e **3443** se usar HTTPS);
-- se o roteador tem “isolamento de clientes/AP”, desative;
-- o app precisa do notebook ligado: o celular é só a interface.
-
-Firewall:
-
 ```bash
-# Ubuntu (ufw)
-sudo ufw allow 3000/tcp
-sudo ufw allow 3443/tcp
+hostname -I
+# ou
+ip -4 addr show | grep inet
 ```
 
-```powershell
-# Windows (PowerShell como administrador)
-New-NetFirewallRule -DisplayName "Drift Rent" -Direction Inbound -Protocol TCP -LocalPort 3000,3443 -Action Allow
-```
+No celular, abra `http://IP-DO-NOTEBOOK:3000` (para testar) ou o HTTPS do Tailscale (para instalar
+o PWA).
 
 ---
 
 ## 2. PWA no celular via HTTPS do Tailscale
 
-O PWA precisa de **HTTPS confiável** para registrar o service worker e permitir
-“Instalar aplicativo” no Chrome ou “Adicionar à Tela de Início” no Safari. A forma
-recomendada neste projeto é o **HTTPS do Tailscale**, que já usa um certificado público
-válido e não exige instalar CA no celular.
-
-Pré-requisitos: Tailscale instalado e conectado no **notebook** e no **celular**, ambos na
-mesma tailnet. O notebook pode continuar servindo a LAN em HTTP normalmente.
-
-No notebook, com o sistema rodando (`npm start`):
+O PWA precisa de contexto seguro. O caminho recomendado é o HTTPS da tailnet:
 
 ```bash
-# se der "Access denied", habilite seu usuário como operador do Tailscale (uma vez):
+# uma única vez, se o comando abaixo der "Access denied":
 sudo tailscale set --operator=$USER
 
+# publica a porta 3000 em https://<hostname>.<tailnet>.ts.net
 tailscale serve --bg 3000
 tailscale serve status
 ```
 
-> Alternativa: `sudo tailscale serve --bg 3000`. O serviço do Tailscale roda como root;
-> por isso a publicação exige essa permissão. Depois de `set --operator`, os próximos
-> comandos não precisam mais de `sudo`.
-
-O comando publica o app em algo como:
-
-```
-https://lucas-pc.tailf257d9.ts.net
-```
-
-Abra essa URL no celular (com o Tailscale conectado). O certificado é válido e o PWA
-funciona em tela cheia. Para desfazer a publicação:
+Alternativa, executando como root:
 
 ```bash
-tailscale serve reset
+sudo tailscale serve --bg 3000
 ```
 
-> Se o `tailscale serve` informar que HTTPS está desabilitado, ative
-> **HTTPS Certificates** no painel de administração do Tailscale (DNS) e tente novamente.
-> O Tailscale precisa de internet; o modo LAN puro continua funcionando sem ele.
+O Tailscale usa certificado confiável; **não é necessário instalar CA local**.
 
-### Instalar o PWA
+### Instalar
 
-**Android (Chrome):** abra a URL HTTPS, toque no menu **⋮** e escolha
-**Instalar aplicativo** (ou “Adicionar à tela inicial”).
+- **Chrome Android:** abra a URL HTTPS → menu **⋮** → **Instalar aplicativo**.
+- **Safari iOS:** abra a URL HTTPS → **Compartilhar** → **Adicionar à Tela de Início**.
+- No notebook, `localhost` também é contexto seguro.
 
-**iPhone/iPad (Safari):** abra a URL HTTPS, toque em **Compartilhar** e escolha
-**Adicionar à Tela de Início**.
+O app tem manifest **Carrinhos de Drift** / **Drift**, modo standalone, orientação retrato,
+service worker com precache do shell, `/api/*` em **NetworkOnly** e banner
+**“Nova versão disponível — atualizar”**. O timer nunca é recarregado automaticamente.
 
-O ícone instalado abre em modo standalone, com o nome **Drift** / **Carrinhos de Drift**.
-O service worker gerado pelo `vite-plugin-pwa` mantém o shell do app em cache; as chamadas
-`/api/*` são **NetworkOnly** e nunca vêm do cache, garantindo timer e status sempre do
-servidor local. O Socket.IO/WebSocket não é cacheado.
-
-O build de produção (`npm run build`) gera em `frontend/dist/`:
-
-- `manifest.webmanifest` (nome, ícones e modo standalone);
-- `sw.js` (Workbox com precache, navegação SPA e runtime caching);
-- `registerSW.js` (registro gerado pelo plugin).
-
-Quando há uma nova versão, o app mostra o banner **“Nova versão disponível — atualizar”** e
-recarrega somente quando você toca em **Atualizar**.
-
-### Alternativa: LAN com HTTPS local (sem Tailscale)
-
-Também é possível gerar um certificado local. Se o IP do notebook mudar, use
-`npm run cert -- --force` (reaproveita a CA já confiável) e reinicie:
+### HTTPS local alternativo (sem Tailscale)
 
 ```bash
 npm run cert
 npm start
 ```
 
-O app atende em **`https://IP-DO-NOTEBOOK:3443`**. Para o navegador confiar:
-
-1. Baixe `backend/certs/local-ca.crt` pelo painel em **Ajustes → Rede local → baixar
-   certificado local**.
-2. **Android:** Ajustes → Segurança → Criptografia e credenciais → Instalar certificado →
-   Certificado de CA → selecione o arquivo.
-3. **iPhone/iPad:** instale o perfil em Ajustes → Geral → VPN e Gerenciamento de
-   Dispositivos e ative a confiança em Ajustes → Geral → Sobre → Ajustes de Confiança de
-   Certificado.
-4. Abra `https://IP:3443`, faça login e instale o PWA.
-
-> Em `http://IP:3000` (sem HTTPS), o celular cria apenas um atalho; o service worker e a
-> instalação completa ficam bloqueados pela política do navegador. Para uso na LAN sem
-> Tailscale, prefira a opção HTTPS local acima.
-
-No modo LAN puro, o Wi-Fi não precisa ter internet; ele só precisa conectar os celulares
-ao notebook. Para o HTTPS via Tailscale, o notebook precisa de internet para o túnel.
-Não há requisições a CDNs: fontes são do sistema e ícones são SVG locais.
+O certificado local fica em `backend/certs/` e a CA pode ser baixada em
+`http://IP:3000/local-ca.crt`. Instale a CA no celular para liberar o PWA em
+`https://IP:3443`.
 
 ---
 
-## 3. Como usar no dia a dia
+## 3. Multi-tenant
 
-### Painel (tela principal)
+### Cadastro público
 
-- Grade de carrinhos com foto/código/status.
-- **Verde** disponível, **azul** em uso, **amarelo** carregando, **cinza** manutenção.
-- Timer regressivo atualizado a cada segundo (o relógio é o do servidor).
-- Resumo: total de carrinhos, em uso, faturamento recebido hoje e pendências do dia.
-- Alertas: aviso **60 s antes** (configurável em Ajustes) e alarme visual/sonoro/vibração
-  no fim do tempo. O título da aba pisca e, com permissão, uma notificação é exibida.
-- **Ative o som** no primeiro toque (botão “Ativar som”). Por política dos navegadores,
-  áudio só toca após uma interação do usuário. Deixe o painel aberto no notebook/celular.
+Acesse `https://SEU-ENDERECO/cadastro` (ou **Criar meu negócio** na tela de login).
+
+Ao concluir, o sistema:
+
+1. cria o tenant com slug único;
+2. cria o primeiro usuário como **admin** daquele tenant;
+3. cria as categorias **Drift 🏎️, Kart 🏁, Patinete 🛴 e Quadriciclo 🏍️**;
+4. cria os planos globais de **5, 10 e 15 minutos**;
+5. cria as configurações iniciais;
+6. autentica o admin e abre o painel.
+
+Cada negócio começa vazio de carrinhos. O admin cadastra a frota, operadores e planos.
+
+### Login
+
+- O campo **Usuário ou e-mail** aceita o username ou o e-mail.
+- Operador e admin herdam o tenant do próprio usuário; não existe seletor de tenant.
+- Admin cria operadores em **Mais → Usuários**; o `tenant_id` é sempre o do admin logado.
+- Negócio desativado bloqueia login e invalida tokens/sockets existentes.
+
+### Superadmin
+
+O superadmin não é um admin de negócio. Ele só acessa a tela **Negócios**:
+
+- lista tenants com contagem de usuários e o e-mail do admin;
+- cria novos negócios (tenant + admin inicial + categorias/planos padrão);
+- ativa/desativa negócios;
+- não baixa backups nem dados operacionais.
+
+Ele **não** acessa `/api/dashboard`, sessões, caixa, relatórios ou qualquer dado operacional
+desses tenants (a API responde 403).
+
+### Isolamento
+
+- O middleware de autenticação injeta `req.tenantId` a partir do usuário.
+- Toda consulta operacional inclui `tenant_id`.
+- Rotas por ID validam o tenant antes de qualquer operação e retornam **404** quando o recurso é de
+  outro negócio (não 403, para não revelar existência).
+- Socket.IO usa salas `tenant:<id>`; dashboard e avisos de timer são emitidos só para a sala do
+  tenant.
+- Configurações, fechamentos de caixa e eventos também são por tenant.
+- Backups do banco são arquivos do servidor. Não há download de banco inteiro pelo app; use
+  `npm run backup`/acesso ao filesystem no notebook.
+
+---
+
+## 4. Categorias e planos
+
+- **Mais → Categorias**: criar, editar, ativar/desativar. Categorias com carrinhos não são apagadas;
+  são desativadas para preservar o histórico.
+- Todo carrinho exige uma categoria; o card mostra **cor + ícone + nome**.
+- O dashboard tem filtros por **categoria** e por **status**.
+- **Mais → Planos**: um plano pode ser:
+  - **global** (`category_id = NULL`): vale para todas as categorias;
+  - **específico**: aparece e é aceito somente para carrinhos daquela categoria.
+- O seletor de plano no início/renovação mostra globais + específicos da categoria do carrinho.
+- O backend também valida: mandar um plano de outra categoria retorna 400.
+
+Categorias iniciais:
+
+| Categoria | Ícone | Cor |
+|---|---|---|
+| Drift | 🏎️ | `#f97316` |
+| Kart | 🏁 | `#2563eb` |
+| Patinete | 🛴 | `#16a34a` |
+| Quadriciclo | 🏍️ | `#7c3aed` |
+
+---
+
+## 5. Operação: alugar, encerrar e check-in/out
 
 ### Iniciar aluguel
 
-1. Toque em **Iniciar aluguel** no carrinho disponível.
-2. Informe o cliente, escolha um plano ou use **Outro valor** (minutos/valor livres).
-3. Escolha **[No final]** ou **[Pago adiantado]**. No adiantado, selecione a forma de
-   pagamento (dinheiro/Pix/cartão); o valor entra imediatamente no caixa do dia.
-4. Confirme. O servidor grava `iniciado_em`/`fim_previsto_em` e marca o carrinho como
-   **em uso**. O timer começa no servidor, não no celular.
+- Pelo dashboard: **Novo aluguel** ou **Iniciar aluguel** no card.
+- Pelo QR: **Escanear** → câmera → tela do carrinho → **Iniciar aluguel agora**.
+- O nome do cliente é **opcional**; se vazio, a UI mostra **“Cliente não informado”**.
+- Escolha plano (filtrado pela categoria) ou valor avulso.
+- O timer começa no servidor; fechar o app não interrompe.
 
-Se o cliente renovar um aluguel já pago adiantado, apenas o **valor adicional** fica
-pendente para o encerramento; o valor já recebido não é cobrado de novo. Ao encerrar, o
-sistema mostra o total, o adiantado e o restante a receber.
+### Encerrar (check-in)
 
-### Durante a sessão
+Ao encerrar, o operador escolhe em **1 toque** o destino:
 
-- **Renovar:** adiciona tempo/valor sem encerrar. Se o tempo já estourou, a renovação conta
-  a partir de agora.
-- **Encerrar:** registra o horário real, a duração e o valor; permite receber agora
-  (dinheiro/Pix/cartão) ou deixar **pendente** para acertar depois no histórico.
+1. **Voltar para Disponível**
+2. **Enviar para Carregamento**
+3. **Enviar para Manutenção**
 
-### Histórico
+O pagamento pode ser recebido no encerramento ou ficar pendente no histórico. O carrinho vai para o
+status escolhido independentemente do pagamento.
 
-Filtros por período (atalhos Hoje/7 dias/30 dias), carrinho, cliente, pago/pendente e status.
-Ações por sessão:
+### Outros status
 
-- **Ver detalhes** e a auditoria completa (`SessionEvent`);
-- **Registrar/alterar pagamento** (operador também pode marcar como pago);
-- **Editar valor** (somente admin, com registro na auditoria);
-- **Cancelar** (somente admin, motivo obrigatório, mantém no histórico);
-- **Excluir do histórico** (somente admin, soft delete; auditoria fica preservada).
+- **Carregando:** o operador pode fazer check-in pelo scan com **Marcar como Disponível**.
+- **Manutenção:** somente admin libera pelo scan, com campo de observação.
+- **Disponível:** oferece **Iniciar aluguel agora**.
+- **Em uso:** oferece **Renovar**, **Encerrar**, **Registrar pagamento** e **Editar cliente**.
 
-### Relatórios (admin)
+### QR sem câmera
 
-- Recebido por dia, com atalhos para 7 dias, semana atual, mês, 30 dias e período livre.
-- Ticket médio, sessões, cancelamentos, faturamento por forma de pagamento.
-- Carrinhos mais usados, horário de pico e **pendências por cliente** (devedores).
-
-### Caixa (admin)
-
-- Totais do dia por forma de pagamento e por operador.
-- Lista de pagamentos e de sessões pendentes.
-- **Fechar caixa** arquiva um resumo imutável (com observação, quem fechou e os totais).
-- O comprovante pode ser reimpresso pelo navegador.
-
-### Cadastros (admin)
-
-- **Carrinhos:** código único, foto (câmera/galeria), status, observação. Exclusão é soft
-  delete; o histórico permanece.
-- **Planos:** nome, minutos, valor, ativo/inativo. Planos já usados são desativados em vez
-  de apagados.
-- **Usuários:** admin/operador, ativar/desativar, redefinir senha. O sistema impede ficar
-  sem administrador ativo e impede desativar a própria conta.
-- **Ajustes:** nome do estabelecimento, antecedência do aviso, backups, informações de rede.
+A tela **Escanear** sempre mostra o campo **“Sem câmera? Digite o código”**. Digitar `D01`, por
+exemplo, abre o mesmo fluxo do QR.
 
 ---
 
-## 4. Perfis e permissões
+## 6. QR Codes e etiquetas
 
-| Recurso | Admin | Operador |
-|---|---|---|
-| Painel / timer / alertas | ✅ | ✅ |
-| Iniciar, renovar e encerrar sessões | ✅ | ✅ |
-| Marcar pagamento/restante | ✅ | ✅ |
-| Desmarcar parcela final | ✅ | ❌ 403 |
-| Histórico e detalhes/auditoria | ✅ | ✅ |
-| Cancelar sessão / editar valor / excluir histórico | ✅ | ❌ 403 |
-| Relatórios, caixa e fechamento | ✅ | ❌ 403 |
-| Carrinhos, planos, usuários e ajustes | ✅ | ❌ 403 |
+A tela **Mais → QR Codes** (admin) mostra todos os carrinhos, agrupados por categoria.
 
-O backend aplica o RBAC em todas as rotas; a interface também esconde/redireciona as telas
-administrativas para operadores.
+Cada carrinho tem um `qr_token` opaco (UUID v4), independente do ID numérico. O QR aponta para:
 
----
-
-## 5. Banco de dados e schema
-
-Arquivos em tempo de execução:
-
-```
-backend/data/drift.db          # SQLite (WAL)
-backend/uploads/               # fotos
-backend/backups/               # .db com timestamp
+```text
+https://SEU-ENDERECO/scan/<qr_token>
 ```
 
-Tabelas principais:
+Ações:
 
-```sql
-users (
-  id, nome, username UNIQUE NOCASE, email, senha_hash, role CHECK(admin|operador),
-  ativo, must_change_password, token_version, ultimo_login_em, criado_em, atualizado_em
-)
+- **Imprimir QR:** abre a impressão do navegador com uma etiqueta de **5 × 5 cm**
+  (QR + código + categoria + nome do negócio).
+- **Baixar PNG:** gera um PNG da etiqueta no próprio navegador.
+- **Imprimir todos (PDF):** o backend gera um **PDF A4** com uma etiqueta por carrinho, em grade
+  (3 colunas × 4 linhas, 12 por página), usando `pdfkit` + `qrcode`.
 
-carts (
-  id, codigo UNIQUE NOCASE (entre ativos), foto_url, status
-  CHECK(disponivel|em_uso|carregando|manutencao), observacao,
-  criado_em, atualizado_em, excluido_em
-)
+O QR gerado usa o **origin atual** do navegador. Se você abrir o admin pelo Tailscale, a etiqueta
+já aponta para o Tailscale. Se abrir por `localhost`, a etiqueta apontará para localhost e não
+funcionará no celular; gere novamente pelo endereço HTTPS correto.
 
-pricing_plans (
-  id, nome, minutos, valor_centavos, ativo, criado_em, atualizado_em
-)
+### Scan
 
-sessions (
-  id, cart_id, cliente_nome, plano_id, plano_nome (snapshot),
-  minutos_contratados, valor_centavos, iniciado_em, fim_previsto_em,
-  encerrado_em, duracao_segundos, status CHECK(em_andamento|encerrada|cancelada),
-  pago, forma_pagamento CHECK(dinheiro|pix|cartao), operador_id, observacao,
-  pagamento_adiantado, valor_adiantado_centavos, forma_adiantado, adiantado_em,
-  motivo_cancelamento, pago_em, criado_em, atualizado_em, excluida_em, excluida_por
-)
+1. **Mais → Escanear** (ou o item **Escanear** no menu).
+2. Toque em **Abrir câmera e escanear** e permita a câmera.
+3. O app lê a URL, chama `GET /api/scan/:qr_token` autenticado e abre a tela pelo status.
+4. Se o token for de outro negócio: **“QR não reconhecido neste negócio.”**
+5. Se a câmera falhar, use o código manual.
 
-session_events (
-  id, session_id, tipo CHECK(inicio|renovacao|encerramento|cancelamento|pagamento|
-  edicao_valor|exclusao), payload_json, usuario_id, criado_em
-)
-
-settings (chave PRIMARY KEY, valor, atualizado_em)
-cash_closures (id, data UNIQUE, total_centavos, total_pendente_centavos,
-               qtd_sessoes, payload_json, usuario_id, criado_em)
-```
-
-Garantias importantes:
-
-- índice parcial **único** garante **no máximo uma sessão em andamento por carrinho**;
-- `plano_nome` e valores são copiados para a sessão (mudanças futuras no plano não alteram
-  o histórico);
-- toda operação relevante grava `session_events` (quem, quando, payload);
-- exclusões de histórico são **soft delete** (`excluida_em`) para preservar auditoria;
-- dinheiro em centavos; horários em ISO UTC;
-- o **adiantado** é registrado em `adiantado_em`/`forma_adiantado` e entra no caixa no dia
-  do início; o restante (após eventual renovação) entra no dia do encerramento. O campo
-  `pago` só fica verdadeiro quando o total foi quitado.
+A câmera exige HTTPS (Tailscale) ou `localhost`. `html5-qrcode` funciona em Chrome Android e Safari
+iOS sem app nativo.
 
 ---
 
-## 6. Timer, tempo real e resiliência
+## 7. Cliente opcional
 
-- Ao iniciar/renovar, o **servidor** define `fim_previsto_em` no SQLite. O celular nunca
-  calcula o fim “por conta própria”.
-- Todo cliente autenticado recebe via Socket.IO:
-  - snapshot do painel a cada mutação;
-  - `tick` com `{ now }` a cada 1 segundo (sincroniza o relógio);
-  - `session:expiring` / `session:expired` no cruzamento dos limites.
-- O cliente calcula o restante com o **offset do relógio do servidor**, então celulares com
-  hora errada mostram o tempo correto.
-- **Fechar/reabrir o navegador** não muda nada: o estado vem do banco.
-- **Reiniciar o backend** não zera timers: as sessões `em_andamento` são recarregadas do
-  SQLite e o cálculo é refeito a partir de `fim_previsto_em`.
-- O sistema **não encerra** a sessão automaticamente no fim; ele alerta e libera o operador
-  para decidir entre renovar ou encerrar.
-- O alarme final é repetido até ser confirmado. A confirmação fica no `localStorage` por
-  sessão/versão de término, para não repetir ao recarregar a página.
+- Campo **“Nome do cliente (opcional)”** no início.
+- Iniciar com o campo vazio funciona normalmente.
+- Histórico e cards mostram **Cliente não informado** (nunca “null”).
+- **Editar nome do cliente** disponível para admin e operador no menu de ações do histórico e na
+  tela do scan. A alteração gera um `SessionEvent` do tipo `edicao_cliente`.
+- Relatórios agrupam sessões sem nome como **Sem identificação**.
 
 ---
 
-## 7. Backup e restauração
+## 8. Perfis e permissões
 
-- **Automático:** todos os dias às `03:00` (configurável por `BACKUP_HOUR`), usando a API
-  de backup do SQLite (segura com WAL). Nome: `auto-AAAA-MM-DD_HH-mm-ss.db`.
-- **Na subida:** se o último backup tiver mais de 24 h, cria um na hora.
-- **Manual:** `npm run backup` ou **Ajustes → Backups → Criar agora**.
-- **Retenção:** 30 dias por padrão (`BACKUP_RETENTION_DAYS`); backups antigos são removidos.
-- **Download:** em Ajustes, botão “Baixar”, ou via API `/api/settings/backups`.
+| Ação | Superadmin | Admin do tenant | Operador |
+|---|---|---|---|
+| Criar/desativar tenant | ✅ | ❌ | ❌ |
+| Ver/gerenciar dados operacionais | ❌ | ✅ (próprio tenant) | ✅ (próprio tenant) |
+| Criar/editar carrinhos, planos, categorias | ❌ | ✅ | ❌ |
+| Gerenciar usuários | ❌ | ✅ | ❌ |
+| Iniciar/renovar/encerrar sessão | ❌ | ✅ | ✅ |
+| Registrar pagamento | ❌ | ✅ | ✅ |
+| Desmarcar pagamento / editar valor | ❌ | ✅ | ❌ |
+| Cancelar/excluir sessão | ❌ | ✅ | ❌ |
+| Caixa, relatórios, configurações | ❌ | ✅ | ❌ |
+| QR Codes / imprimir etiquetas | ❌ | ✅ | ❌ |
 
-Restaurar:
+---
+
+## 9. Banco, migração e rollback
+
+O schema atual inclui:
+
+- `tenants`, `categories`, `users` (com `superadmin`), `carts`, `pricing_plans`, `sessions`,
+  `session_events`, `settings`, `cash_closures`, `schema_migrations`;
+- `tenant_id` indexado e com FK em todas as tabelas operacionais;
+- `carts.category_id` obrigatório, `carts.qr_token` único, `pricing_plans.category_id` opcional;
+- `sessions.cliente_nome` nullable;
+- `settings` com PK `(tenant_id, chave)` e caixa único por `(tenant_id, data)`.
+
+A migração é automática, transacional e idempotente. Ela detecta banco legado, cria um backup
+`backend/backups/pre-migration-*.db` e associa todos os dados existentes ao tenant **Meu Negócio**
+(`default`). O admin atual continua no tenant default; o superadmin é criado pelo seed.
+
+Detalhes e rollback: **[backend/migrations/MIGRACAO.md](backend/migrations/MIGRACAO.md)**.
+Schema final de referência: **[backend/migrations/001_multi_tenant.sql](backend/migrations/001_multi_tenant.sql)**.
+
+### Restauração manual
 
 ```bash
-# 1. pare o servidor (Ctrl+C)
-# 2. guarde o banco atual, por segurança
-cp backend/data/drift.db backend/data/drift.db.antes
-# 3. copie o backup escolhido
-cp backend/backups/auto-2026-10-27_03-00-00.db backend/data/drift.db
+# pare o servidor
+cp backend/data/drift.db backend/backups/antes-restauracao.db
+cp backend/backups/pre-migration-AAAAMMDD-HHMMSS.db backend/data/drift.db
 rm -f backend/data/drift.db-wal backend/data/drift.db-shm
-# 4. suba novamente
 npm start
 ```
 
-Recomendação: copie também `backend/backups/` e `backend/uploads/` para um pendrive/HD
-periodicamente. O backup do banco não inclui as fotos.
+Backups automáticos continuam rodando diariamente (horário/retenção em `backend/.env`). O download
+do banco inteiro não é exposto pelo app; use `npm run backup` e o filesystem do notebook.
 
 ---
 
-## 8. Testes
+## 10. Testes
+
+### Automatizados
 
 ```bash
 npm test
 ```
 
-Cobrem, com banco temporário isolado:
+Cobre autenticação/refresh, rate limit, adiantado, renovação, encerramento, caixa, isolamento entre
+tenants, signup público, desativação por superadmin, categorias, planos por categoria, QR/PDF,
+check-in, destino do carrinho e cliente opcional.
 
-- auth: login, senha obrigatória no 1º acesso, refresh, logout, token inválido, rate-limit;
-- RBAC: operador recebe **403** em usuários, relatórios, caixa, ajustes, carrinhos, planos,
-  cancelamento, edição de valor e exclusão de histórico;
-- carrinhos: upload real de imagem (JPEG), validação do conteúdo, código único;
-- sessões: início com tempo do servidor, bloqueio de carrinho em uso/manutenção, renovação
-  somando tempo/valor, encerramento pago/pendente, pagamento pelo operador;
-- pagamento adiantado: entrada imediata no caixa, renovação cobrando apenas o adicional,
-  encerramento sem cobrança duplicada e baixa da parcela final;
-- resiliência: nova conexão ao mesmo SQLite preserva a sessão ativa e o `fim_previsto_em`;
-  sessão vencida continua ativa e pode ser encerrada;
-- auditoria: eventos de início, renovação, encerramento, pagamento e edição de valor;
-- cancelamento, soft delete e filtros do histórico;
-- relatórios, caixa, fechamento (409 na segunda vez) e backup em disco.
+### Manual no celular (via Tailscale)
 
-O projeto também foi validado ponta a ponta em navegador (Chromium mobile) para:
-dois celulares vendo o timer em tempo real, reload persistente, alarme no fim, upload de
-foto, PWA/service worker e operador sem acesso às telas de admin.
+Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no celular.
 
----
+**Multi-tenant**
+- [ ] Abrir `/cadastro`, criar “Praça Teste” com um admin novo; o painel abre com 4 categorias e
+      3 planos e **0 carrinhos**.
+- [ ] Sair e entrar com o admin do tenant default; a frota dele não aparece para a Praça Teste.
+- [ ] Entrar como `superadmin`; criar um negócio pelo botão **Novo negócio**; ver os negócios; desativar a Praça Teste; tentar usar o token
+      antigo (deve cair no login); reativar.
+- [ ] Logar como operador de um tenant e confirmar que ele só vê a frota/histórico daquele tenant.
 
-## 9. Docker (opcional)
+**Categorias**
+- [ ] Admin cria “Bicicleta”; ela aparece no cadastro de carrinho.
+- [ ] Cadastrar carrinho com Bicicleta; o card mostra ícone/cor.
+- [ ] No dashboard, filtrar por Bicicleta e por status; combinar os dois.
+- [ ] Criar plano específico de Bicicleta e um global; iniciar aluguel de Bicicleta e conferir que
+      só aparecem os dois.
+- [ ] Tentar iniciar Bicicleta com plano de Drift (API/console) deve falhar.
 
-Há `Dockerfile` e `docker-compose.yml` prontos.
+**QR / check-in**
+- [ ] Admin abre **QR Codes**; imprime uma etiqueta (5 × 5 cm) e baixa o PDF A4.
+- [ ] Escanear o QR de carrinho disponível; iniciar aluguel.
+- [ ] Escanear carrinho em manutenção: não deve permitir aluguel; admin libera com observação.
+- [ ] Escanear carrinho em uso; encerrar e escolher **Carregamento**; escanear de novo e tocar em
+      **Marcar como Disponível**.
+- [ ] Escanear o QR de outro tenant: deve mostrar “QR não reconhecido neste negócio”.
+- [ ] Negar a permissão da câmera e usar o código manual; o fluxo deve continuar.
 
-```bash
-cp .env.docker.example .env
-# edite .env e troque JWT_SECRET e JWT_REFRESH_SECRET
-# sugestão: openssl rand -hex 32
-npm run cert            # opcional, para HTTPS/PWA no celular
-mkdir -p backend/data backend/uploads backend/backups
-docker compose up -d --build
-docker compose logs -f
-```
+**Cliente opcional**
+- [ ] Iniciar sem nome; card/histórico mostram “Cliente não informado”.
+- [ ] Editar o nome no histórico; conferir a alteração e o evento de auditoria.
+- [ ] Relatório de pendências mostra “Sem identificação” para o cliente nulo.
 
-- Acesse `http://IP:3000` e, com certificado, `https://IP:3443`.
-- Os volumes mantêm banco, fotos, backups e certificados fora do container.
-- O primeiro boot cria o banco e o admin `admin/admin123` (troca obrigatória).
-- Não rode `npm start` e Docker ao mesmo tempo (conflito de porta).
-- Atualizou o código? `docker compose up -d --build`.
-
----
-
-## 10. Scripts
-
-| Comando | O que faz |
-|---|---|
-| `npm start` | **Produção local:** garante `.env`, instala/builda se preciso, sobe o servidor |
-| `npm run dev` | Backend com `--watch` na 3000 + Vite com HMR na 5173 |
-| `npm run build` | Compila o frontend para `frontend/dist` |
-| `npm run seed` | Cria dados iniciais se o banco estiver vazio |
-| `npm test` | Testes das rotas críticas (Node test runner) |
-| `npm run backup` | Cria um backup manual do SQLite |
-| `npm run cert` | Gera CA + certificado HTTPS local (PWA no celular) |
-
-Para desenvolvimento, acesse `http://localhost:5173` (Vite faz proxy de `/api`,
-`/socket.io` e `/uploads` para a 3000). O `npm start` serve o build de produção na 3000.
+**Não regressões**
+- [ ] Timer continua no servidor ao fechar/abrir o app.
+- [ ] Renovação soma tempo e mantém o adiantado; adicional fica pendente.
+- [ ] Caixa/fechamento e relatórios batem com os pagamentos.
+- [ ] PWA continua instalável e o banner de atualização aparece após um novo build.
 
 ---
 
 ## 11. Variáveis de ambiente (`backend/.env`)
 
-| Variável | Padrão | Descrição |
-|---|---|---|
-| `PORT` | `3000` | Porta HTTP |
-| `HOST` | `0.0.0.0` | Interface (aceita LAN) |
-| `NODE_ENV` | `production` | Ambiente |
-| `TZ` | `America/Fortaleza` | Fuso das regras de dia/caixa |
-| `JWT_SECRET` | gerado | Segredo do access token |
-| `JWT_REFRESH_SECRET` | gerado | Segredo do refresh token |
-| `ACCESS_TOKEN_TTL` | `12h` | Validade do access token |
-| `REFRESH_TOKEN_TTL` | `30d` | Validade da sessão persistente |
-| `BCRYPT_ROUNDS` | `10` | Custo do bcrypt |
-| `DB_PATH` | `data/drift.db` | Banco SQLite |
-| `UPLOAD_DIR` | `uploads` | Fotos |
-| `BACKUP_DIR` | `backups` | Backups |
-| `BACKUP_HOUR` | `3` | Hora local do backup diário |
-| `BACKUP_RETENTION_DAYS` | `30` | Dias de retenção |
-| `MAX_UPLOAD_MB` | `6` | Tamanho máximo de foto |
-| `HTTPS_PORT` | `3443` | Porta HTTPS opcional |
-| `TRUST_PROXY` | `0` | Use `1` só atrás de proxy reverso |
+```env
+PORT=3000
+HOST=0.0.0.0
+TZ=America/Fortaleza
+JWT_SECRET=...
+JWT_REFRESH_SECRET=...
+DB_PATH=data/drift.db
+UPLOAD_DIR=uploads
+BACKUP_DIR=backups
 
-Ao rodar `npm start`, segredos vazios são preenchidos automaticamente. Se você apagar
-`backend/.env`, as sessões existentes deixam de validar — mantenha o arquivo protegido e
-fora do Git.
+SUPERADMIN_USERNAME=superadmin
+SUPERADMIN_PASSWORD=superadmin123
+SUPERADMIN_NAME=Superadministrador
+SUPERADMIN_EMAIL=
+
+BACKUP_HOUR=3
+BACKUP_RETENTION_DAYS=30
+ACCESS_TOKEN_TTL=12h
+REFRESH_TOKEN_TTL=30d
+BCRYPT_ROUNDS=10
+MAX_UPLOAD_MB=6
+TRUST_PROXY=0
+```
+
+Use `TRUST_PROXY=1` apenas atrás de proxy reverso. Para HTTPS local: `HTTPS_PORT=3443`,
+`HTTPS_CERT` e `HTTPS_KEY`.
 
 ---
 
-## 12. Estrutura de pastas
+## 12. Scripts
 
-```
-DriftApp/
-├─ backend/
-│  ├─ src/
-│  │  ├─ app.js               Express, segurança, rotas, estáticos
-│  │  ├─ server.js            HTTP/HTTPS + Socket.IO + jobs
-│  │  ├─ db.js                schema SQLite/migração inicial
-│  │  ├─ config.js            env e caminhos
-│  │  ├─ seed.js              admin, planos, carrinhos
-│  │  ├─ middleware/auth.js   JWT, RBAC, troca de senha
-│  │  ├─ routes/              auth, users, carts, plans, sessions, ...
-│  │  ├─ services/            sessões, dashboard, relatórios, caixa, backup
-│  │  └─ scripts/             backup manual
-│  ├─ tests/                  testes de rotas críticas
-│  ├─ data/                   drift.db (runtime)
-│  ├─ uploads/                fotos (runtime)
-│  ├─ backups/                backups (runtime)
-│  └─ certs/                  certificado local (runtime)
-├─ frontend/
-│  ├─ public/                 manifest, sw.js, ícones, favicon
-│  ├─ src/
-│  │  ├─ components/          UI, carrinho, modais, alertas, layout
-│  │  ├─ pages/               login, painel, histórico, relatórios, etc.
-│  │  ├─ context/             auth, socket, toasts
-│  │  ├─ hooks/               relógio do servidor, alertas, PWA
-│  │  └─ lib/                 api, formatação, áudio, fotos
-│  └─ dist/                   build servido pelo backend
-├─ scripts/                   start único, dev, certificado
-├─ Dockerfile / docker-compose.yml
-└─ README.md
+```bash
+npm start       # servidor com supervisor + build
+npm run dev     # servidor em watch + Vite
+npm run build   # build do PWA
+npm test        # testes backend
+npm run seed    # garante dados iniciais/superadmin e migra se preciso
+npm run backup  # cria backup manual global
+npm run cert    # gera CA/certificado local
 ```
 
 ---
 
 ## 13. Segurança e limitações
 
-- Login obrigatório em **todas as rotas de API** (exceto `/api/health` e login/refresh).
-  Arquivos estáticos (JS/CSS/manifest/ícones) e fotos em `/uploads` são públicos por
-  necessidade do navegador; as fotos têm nomes aleatórios e o sistema deve rodar em uma
-  rede confiável.
-- JWT assinado com segredo local; access token curto + refresh httpOnly de 30 dias.
-- Senhas com bcrypt (custo 10), troca obrigatória no primeiro acesso, redefinição pelo admin.
-- Rate-limit no login (10 falhas/15 min por IP) e limite geral por API.
-- RBAC no backend; mensagens de erro não expõem detalhes internos.
-- CSP, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` em produção.
-- Upload valida mimetype **e assinatura do arquivo** (JPEG/PNG/WebP), com limite de tamanho.
-- SQLite com WAL e backup consistente; não edite o banco com o servidor ligado.
-- HTTP na LAN não é criptografado. Para senhas/fotos em rede não confiável, use HTTPS
-  (`npm run cert`) ou um proxy reverso com certificado válido e `TRUST_PROXY=1`.
-- Não há sincronização entre notebooks/lojas diferentes: o banco é local por instalação.
-- O alarme sonoro depende da política de autoplay: toque em “Ativar som” após abrir o app.
-  O alarme visual e o título piscando funcionam de qualquer forma.
+- JWT de acesso curto + refresh httpOnly; `token_version` invalida sessões em senha/tenant inativo.
+- Senhas com bcrypt; troca obrigatória no primeiro acesso de contas semeadas.
+- Rate limit global e no login/signup.
+- Autorização por tenant no backend, não só na UI.
+- Uploads usam nomes aleatórios; o diretório `/uploads` é público para exibir fotos.
+- O painel de tenants é exclusivo do superadmin; backups são arquivos locais do notebook.
+- O app foi feito para uma praça/rede local; não há billing, e-mail transacional ou recuperação de
+  senha por e-mail.
+- O QR lê a câmera via HTTPS; HTTP puro no celular mostra apenas o fallback manual.
 
 ---
 
-## 14. Checklist dos critérios de aceite
+## 14. Problemas comuns
 
-- [x] Dois celulares na mesma rede veem o timer atualizado em tempo real (tick 1 s;
-      medido em teste: ~50 ms para o snapshot da sessão).
-- [x] Fechar o navegador/celular e reabrir mantém o tempo (JWT persistente + estado no SQLite).
-- [x] Reiniciar o backend mantém sessões ativas e o tempo correto (teste automatizado recria
-      a conexão com o mesmo banco e compara `fim_previsto_em`).
-- [x] Operador recebe 403 em usuários, relatórios, caixa, planos, carrinhos, cancelamento,
-      edição de valor e exclusão; a UI esconde essas telas.
-- [x] Alerta visual piscante, som, vibração, título piscando e notificação (com permissão)
-      no fim do tempo; WebSocket entrega o evento mesmo com outra aba em foco.
-- [x] Foto do carrinho aparece no painel após upload (comprimida no celular e validada no
-      servidor).
-- [x] Backup diário e manual gera `.db` em `/backups` (retenção configurável).
-- [x] PWA com manifest, ícones locais, `display: standalone` e service worker (HTTPS/localhost).
-- [x] Nenhuma dependência de CDN; fontes do sistema e ícones SVG locais.
-- [x] `npm start` sobe backend + frontend + banco; README e Docker incluídos.
-
----
-
-## 15. Problemas comuns
-
-**“Sem conexão com o servidor” no celular**
-Verifique IP, mesma rede, firewall e se o notebook está ligado. Teste `/api/health` no
-navegador do notebook e do celular.
-
-**Porta 3000 ocupada**
-Feche outro processo ou altere `PORT` em `backend/.env` e reinicie. Lembre de ajustar a
-porta no firewall.
-
-**“Sessão expirada” após reiniciar**
-O `backend/.env` foi apagado/recriado e os segredos mudaram. Restaure o `.env` antigo ou
-faça login novamente.
-
-**Foto não aparece**
-O upload precisa de JPG/PNG/WebP válido. A imagem é reduzida para até 1280 px; confira se
-`backend/uploads` existe e tem permissão de escrita.
-
-**PWA não instala**
-Use o HTTPS do Tailscale (recomendado), o HTTPS local da seção 2 ou `localhost` no notebook.
-Em HTTP puro o navegador cria apenas um atalho. O botão **Instalar aplicativo** mostra instruções no aparelho.
-
-**Alarme não toca**
-Toque em “Ativar som” uma vez após abrir o painel; mantenha o app aberto. Verifique o volume
-e a permissão de notificações. O alerta visual não depende de áudio.
-
-**Som não toca em outra aba**
-Ative o som, deixe o painel como uma aba do navegador (não feche) e mantenha o notebook
-ligado. O evento chega via WebSocket e o som é disparado pelo áudio já liberado. Se o
-navegador suspender o áudio, use a notificação do sistema, que também é enviada.
-
-**Docker sem permissão nas pastas**
-Crie `backend/data`, `backend/uploads` e `backend/backups` antes de subir e verifique as
-permissões do usuário que roda o Docker.
-
----
-
-Feito para funcionar na praça: simples, offline na LAN e sem depender de nuvem. 🏁
+| Problema | Causa/solução |
+|---|---|
+| “Access denied” no Tailscale | `sudo tailscale set --operator=$USER` ou `sudo tailscale serve --bg 3000`. |
+| PWA não instala | Use HTTPS do Tailscale ou localhost; HTTP no celular não é contexto seguro. |
+| Câmera não abre | Permita a câmera no navegador; em iOS/Android use HTTPS. O campo manual continua disponível. |
+| QR abre “não reconhecido” | O QR é de outro negócio, foi excluído ou a etiqueta foi gerada em outro endereço. Gere novamente pelo HTTPS correto. |
+| QR aponta para localhost | A etiqueta foi impressa pelo admin em `localhost`; abra o admin pelo Tailscale e baixe novamente. |
+| Admin não vê backups | O app não expõe download do banco inteiro; use `npm run backup` no notebook. |
+| Login de tenant inativo | O superadmin precisa reativar o negócio. |
+| Porta 3000 em uso | Feche o outro processo ou altere `PORT`. |
+| Migração falhou | O rollback automático manteve o schema; restaure o `pre-migration-*.db` conforme `MIGRACAO.md`. |

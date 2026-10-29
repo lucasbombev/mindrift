@@ -5,13 +5,17 @@ import { sessionAmounts } from './payments.js';
 
 export const SESSION_SELECT = `
   SELECT s.*, c.codigo AS cart_codigo, c.foto_url AS cart_foto_url,
+         c.category_id AS cart_category_id, cat.nome AS cart_category_nome,
+         cat.icone AS cart_category_icone, cat.cor AS cart_category_cor,
          u.nome AS operador_nome
   FROM sessions s
   JOIN carts c ON c.id = s.cart_id
+  JOIN categories cat ON cat.id = c.category_id
   LEFT JOIN users u ON u.id = s.operador_id
 `;
 
 export const PAYMENT_METHODS = ['dinheiro', 'pix', 'cartao'];
+export const CART_DESTINATIONS = ['disponivel', 'carregando', 'manutencao'];
 
 export function serializeSession(row) {
   if (!row) return null;
@@ -21,7 +25,11 @@ export function serializeSession(row) {
     cartId: row.cart_id,
     cartCodigo: row.cart_codigo || null,
     cartFotoUrl: row.cart_foto_url || null,
-    clienteNome: row.cliente_nome,
+    cartCategoryId: row.cart_category_id ?? null,
+    cartCategoryNome: row.cart_category_nome || null,
+    cartCategoryIcone: row.cart_category_icone || null,
+    cartCategoryCor: row.cart_category_cor || null,
+    clienteNome: row.cliente_nome || null,
     planoId: row.plano_id,
     planoNome: row.plano_nome,
     minutosContratados: row.minutos_contratados,
@@ -49,11 +57,19 @@ export function serializeSession(row) {
   };
 }
 
-export function getSessionById(db, id, { includeDeleted = false } = {}) {
+export function getSessionById(db, tenantId, id, { includeDeleted = false } = {}) {
   const row = db
-    .prepare(`${SESSION_SELECT} WHERE s.id = ?${includeDeleted ? '' : ' AND s.excluida_em IS NULL'}`)
-    .get(id);
+    .prepare(
+      `${SESSION_SELECT} WHERE s.id = ? AND s.tenant_id = ?
+       ${includeDeleted ? '' : 'AND s.excluida_em IS NULL'}`,
+    )
+    .get(id, tenantId);
   return row ? serializeSession(row) : null;
+}
+
+function normalizeClientName(value) {
+  const text = String(value ?? '').trim();
+  return text || null;
 }
 
 function assertPayment(formaPagamento, paid) {
@@ -62,12 +78,15 @@ function assertPayment(formaPagamento, paid) {
   }
 }
 
-function resolvePricing(db, input) {
+function resolvePricing(db, tenantId, input, categoryId) {
   if (input.plano_id) {
     const plan = db
-      .prepare('SELECT * FROM pricing_plans WHERE id = ? AND ativo = 1')
-      .get(input.plano_id);
+      .prepare('SELECT * FROM pricing_plans WHERE id = ? AND tenant_id = ? AND ativo = 1')
+      .get(input.plano_id, tenantId);
     if (!plan) throw badRequest('Plano inválido ou inativo.');
+    if (plan.category_id && plan.category_id !== categoryId) {
+      throw badRequest('Este plano não é válido para a categoria deste carrinho.');
+    }
     return {
       planoId: plan.id,
       planoNome: plan.nome,
@@ -91,15 +110,20 @@ function resolvePricing(db, input) {
   };
 }
 
-export function startSession(db, input, operator) {
+export function startSession(db, tenantId, input, operator) {
   const adiantado = Boolean(input.pagamento_adiantado);
   if (adiantado) assertPayment(input.forma_pagamento, true);
 
   const run = db.transaction(() => {
     const cart = db
-      .prepare('SELECT * FROM carts WHERE id = ? AND excluido_em IS NULL')
-      .get(input.cart_id);
+      .prepare(
+        `SELECT c.*, cat.ativo AS category_ativa FROM carts c
+         JOIN categories cat ON cat.id = c.category_id
+         WHERE c.id = ? AND c.tenant_id = ? AND c.excluido_em IS NULL`,
+      )
+      .get(input.cart_id, tenantId);
     if (!cart) throw notFound('Carrinho não encontrado.');
+    if (!cart.category_ativa) throw badRequest('A categoria deste carrinho está inativa.');
     if (cart.status !== 'disponivel') {
       throw conflict(
         cart.status === 'em_uso'
@@ -110,30 +134,33 @@ export function startSession(db, input, operator) {
     }
     const active = db
       .prepare(
-        "SELECT id FROM sessions WHERE cart_id = ? AND status = 'em_andamento' AND excluida_em IS NULL",
+        `SELECT id FROM sessions WHERE tenant_id = ? AND cart_id = ?
+         AND status = 'em_andamento' AND excluida_em IS NULL`,
       )
-      .get(cart.id);
+      .get(tenantId, cart.id);
     if (active) throw conflict('Este carrinho já possui uma sessão ativa.', 'carrinho_em_uso');
 
-    const pricing = resolvePricing(db, input);
+    const pricing = resolvePricing(db, tenantId, input, cart.category_id);
     const startedAt = new Date();
     const startedIso = startedAt.toISOString();
     const endsAt = addMinutes(startedAt, pricing.minutos);
     const now = nowIso();
     const forma = adiantado ? input.forma_pagamento : null;
+    const cliente = normalizeClientName(input.cliente_nome);
 
     const info = db
       .prepare(
         `INSERT INTO sessions
-          (cart_id, cliente_nome, plano_id, plano_nome, minutos_contratados, valor_centavos,
-           iniciado_em, fim_previsto_em, status, pago, forma_pagamento, pago_em,
-           pagamento_adiantado, valor_adiantado_centavos, forma_adiantado, adiantado_em,
-           operador_id, observacao, criado_em, atualizado_em)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'em_andamento', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (tenant_id, cart_id, cliente_nome, plano_id, plano_nome, minutos_contratados,
+           valor_centavos, iniciado_em, fim_previsto_em, status, pago, forma_pagamento,
+           pago_em, pagamento_adiantado, valor_adiantado_centavos, forma_adiantado,
+           adiantado_em, operador_id, observacao, criado_em, atualizado_em)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'em_andamento', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
+        tenantId,
         cart.id,
-        String(input.cliente_nome).trim(),
+        cliente,
         pricing.planoId,
         pricing.planoNome,
         pricing.minutos,
@@ -154,10 +181,13 @@ export function startSession(db, input, operator) {
       );
     const sessionId = Number(info.lastInsertRowid);
 
-    db.prepare("UPDATE carts SET status = 'em_uso', atualizado_em = ? WHERE id = ?").run(now, cart.id);
-    logEvent(db, sessionId, 'inicio', operator.id, {
+    db.prepare(
+      "UPDATE carts SET status = 'em_uso', atualizado_em = ? WHERE id = ? AND tenant_id = ?",
+    ).run(now, cart.id, tenantId);
+
+    logEvent(db, tenantId, sessionId, 'inicio', operator.id, {
       carrinho: cart.codigo,
-      cliente: String(input.cliente_nome).trim(),
+      cliente,
       plano: pricing.planoNome,
       minutos: pricing.minutos,
       valorCentavos: pricing.valorCentavos,
@@ -168,7 +198,7 @@ export function startSession(db, input, operator) {
       fimPrevisto: endsAt.toISOString(),
     });
     if (adiantado) {
-      logEvent(db, sessionId, 'pagamento', operator.id, {
+      logEvent(db, tenantId, sessionId, 'pagamento', operator.id, {
         pago: true,
         valorCentavos: pricing.valorCentavos,
         formaPagamento: forma,
@@ -176,31 +206,30 @@ export function startSession(db, input, operator) {
         origem: 'inicio_adiantado',
       });
     }
-
     return sessionId;
   });
 
-  const id = run();
-  return getSessionById(db, id);
+  return getSessionById(db, tenantId, run());
 }
 
-export function renewSession(db, id, input, operator) {
+export function renewSession(db, tenantId, id, input, operator) {
   const run = db.transaction(() => {
     const row = db
-      .prepare("SELECT * FROM sessions WHERE id = ? AND status = 'em_andamento' AND excluida_em IS NULL")
-      .get(id);
+      .prepare(
+        `SELECT s.*, c.category_id AS cart_category_id FROM sessions s
+         JOIN carts c ON c.id = s.cart_id
+         WHERE s.id = ? AND s.tenant_id = ? AND s.status = 'em_andamento'
+           AND s.excluida_em IS NULL`,
+      )
+      .get(id, tenantId);
     if (!row) throw notFound('Sessão ativa não encontrada.');
-    const pricing = resolvePricing(db, input);
+    const pricing = resolvePricing(db, tenantId, input, row.cart_category_id);
 
-    // Se o tempo já estourou, a renovação conta a partir de agora.
     const base = Math.max(Date.now(), new Date(row.fim_previsto_em).getTime());
     const newEnd = new Date(base + pricing.minutos * 60_000);
     const newMinutes = row.minutos_contratados + pricing.minutos;
     const newValue = row.valor_centavos + pricing.valorCentavos;
     const now = nowIso();
-    // Um adicional não está coberto pelo pagamento anterior: a sessão volta a ter
-    // um restante pendente para ser cobrado no encerramento. Se o adicional for 0,
-    // mantém o estado de pagamento atual.
     const temAdicional = pricing.valorCentavos > 0;
     const newPago = temAdicional ? 0 : row.pago;
     const newPagoEm = temAdicional ? null : row.pago_em;
@@ -209,11 +238,21 @@ export function renewSession(db, id, input, operator) {
     db.prepare(
       `UPDATE sessions SET minutos_contratados = ?, valor_centavos = ?,
        fim_previsto_em = ?, pago = ?, pago_em = ?, forma_pagamento = ?, atualizado_em = ?
-       WHERE id = ?`,
-    ).run(newMinutes, newValue, newEnd.toISOString(), newPago, newPagoEm, newForma, now, id);
+       WHERE id = ? AND tenant_id = ?`,
+    ).run(
+      newMinutes,
+      newValue,
+      newEnd.toISOString(),
+      newPago,
+      newPagoEm,
+      newForma,
+      now,
+      id,
+      tenantId,
+    );
 
     const after = { ...row, valor_centavos: newValue, pago: newPago };
-    logEvent(db, id, 'renovacao', operator.id, {
+    logEvent(db, tenantId, id, 'renovacao', operator.id, {
       plano: pricing.planoNome,
       minutosAdicionados: pricing.minutos,
       valorAdicionadoCentavos: pricing.valorCentavos,
@@ -226,14 +265,21 @@ export function renewSession(db, id, input, operator) {
     });
   });
   run();
-  return getSessionById(db, id);
+  return getSessionById(db, tenantId, id);
 }
 
-export function endSession(db, id, input, operator) {
+export function endSession(db, tenantId, id, input, operator) {
+  const cartDestino = CART_DESTINATIONS.includes(input.cart_destino)
+    ? input.cart_destino
+    : 'disponivel';
+
   const run = db.transaction(() => {
     const row = db
-      .prepare("SELECT * FROM sessions WHERE id = ? AND status = 'em_andamento' AND excluida_em IS NULL")
-      .get(id);
+      .prepare(
+        `SELECT * FROM sessions WHERE id = ? AND tenant_id = ?
+         AND status = 'em_andamento' AND excluida_em IS NULL`,
+      )
+      .get(id, tenantId);
     if (!row) throw notFound('Sessão ativa não encontrada.');
 
     const amounts = sessionAmounts(row);
@@ -243,37 +289,38 @@ export function endSession(db, id, input, operator) {
 
     const endedAt = new Date();
     const endedIso = endedAt.toISOString();
-    const duration = Math.max(0, Math.round((endedAt.getTime() - new Date(row.iniciado_em).getTime()) / 1000));
+    const duration = Math.max(
+      0,
+      Math.round((endedAt.getTime() - new Date(row.iniciado_em).getTime()) / 1000),
+    );
     const now = nowIso();
 
-    // Se não há restante (tudo foi adiantado), preserva a data/forma originais.
     const hasFinalPayment = restante > 0 && receberAgora;
     const nextPago = restante > 0 ? (receberAgora ? 1 : 0) : 1;
-    const nextPagoEm = restante > 0
-      ? (receberAgora ? endedIso : null)
-      : row.pago_em || row.adiantado_em || endedIso;
-    const nextForma = restante > 0
-      ? (receberAgora ? input.forma_pagamento : null)
-      : row.forma_pagamento || row.forma_adiantado || null;
+    const nextPagoEm =
+      restante > 0
+        ? receberAgora
+          ? endedIso
+          : null
+        : row.pago_em || row.adiantado_em || endedIso;
+    const nextForma =
+      restante > 0
+        ? receberAgora
+          ? input.forma_pagamento
+          : null
+        : row.forma_pagamento || row.forma_adiantado || null;
 
     db.prepare(
       `UPDATE sessions SET status = 'encerrada', encerrado_em = ?, duracao_segundos = ?,
-       pago = ?, forma_pagamento = ?, pago_em = ?, atualizado_em = ? WHERE id = ?`,
-    ).run(
-      endedIso,
-      duration,
-      nextPago,
-      nextForma,
-      nextPagoEm,
-      now,
-      id,
-    );
-    db.prepare("UPDATE carts SET status = 'disponivel', atualizado_em = ? WHERE id = ?").run(
-      now,
-      row.cart_id,
-    );
+       pago = ?, forma_pagamento = ?, pago_em = ?, atualizado_em = ?
+       WHERE id = ? AND tenant_id = ?`,
+    ).run(endedIso, duration, nextPago, nextForma, nextPagoEm, now, id, tenantId);
 
-    logEvent(db, id, 'encerramento', operator.id, {
+    db.prepare(
+      'UPDATE carts SET status = ?, atualizado_em = ? WHERE id = ? AND tenant_id = ?',
+    ).run(cartDestino, now, row.cart_id, tenantId);
+
+    logEvent(db, tenantId, id, 'encerramento', operator.id, {
       encerradoEm: endedIso,
       duracaoSegundos: duration,
       valorCentavos: row.valor_centavos,
@@ -281,9 +328,10 @@ export function endSession(db, id, input, operator) {
       valorRestanteCentavos: restante,
       pago: Boolean(nextPago),
       formaPagamento: nextForma,
+      destinoCarrinho: cartDestino,
     });
     if (hasFinalPayment) {
-      logEvent(db, id, 'pagamento', operator.id, {
+      logEvent(db, tenantId, id, 'pagamento', operator.id, {
         valorCentavos: restante,
         formaPagamento: input.forma_pagamento,
         pagoEm: endedIso,
@@ -292,17 +340,17 @@ export function endSession(db, id, input, operator) {
     }
   });
   run();
-  return getSessionById(db, id);
+  return getSessionById(db, tenantId, id);
 }
 
-export function setPayment(db, id, input, operator) {
+export function setPayment(db, tenantId, id, input, operator) {
   const paid = Boolean(input.pago);
   assertPayment(input.forma_pagamento, paid);
 
   const run = db.transaction(() => {
     const row = db
-      .prepare("SELECT * FROM sessions WHERE id = ? AND excluida_em IS NULL")
-      .get(id);
+      .prepare('SELECT * FROM sessions WHERE id = ? AND tenant_id = ? AND excluida_em IS NULL')
+      .get(id, tenantId);
     if (!row) throw notFound('Sessão não encontrada.');
     if (row.status !== 'encerrada') {
       throw conflict('Só é possível marcar pagamento de sessões encerradas.', 'sessao_nao_encerrada');
@@ -314,9 +362,10 @@ export function setPayment(db, id, input, operator) {
     const now = nowIso();
     const paidAt = paid ? row.pago_em || now : null;
     db.prepare(
-      `UPDATE sessions SET pago = ?, forma_pagamento = ?, pago_em = ?, atualizado_em = ? WHERE id = ?`,
-    ).run(paid ? 1 : 0, paid ? input.forma_pagamento : null, paidAt, now, id);
-    logEvent(db, id, 'pagamento', operator.id, {
+      `UPDATE sessions SET pago = ?, forma_pagamento = ?, pago_em = ?, atualizado_em = ?
+       WHERE id = ? AND tenant_id = ?`,
+    ).run(paid ? 1 : 0, paid ? input.forma_pagamento : null, paidAt, now, id, tenantId);
+    logEvent(db, tenantId, id, 'pagamento', operator.id, {
       pago: paid,
       valorCentavos: amounts.pendenteCentavos,
       valorAdiantadoCentavos: amounts.adiantadoCentavos,
@@ -325,44 +374,110 @@ export function setPayment(db, id, input, operator) {
     });
   });
   run();
-  return getSessionById(db, id);
+  return getSessionById(db, tenantId, id);
 }
 
-export function editSessionValue(db, id, input, operator) {
-  if (!Number.isInteger(input.valor_centavos) || input.valor_centavos < 0 || input.valor_centavos > 1_000_000) {
+/**
+ * Recebe agora o restante de uma sessão ativa (usado no scan).
+ * O valor é convertido em adiantado para sobreviver a uma eventual renovação.
+ */
+export function payActiveSession(db, tenantId, id, input, operator) {
+  assertPayment(input.forma_pagamento, true);
+  const run = db.transaction(() => {
+    const row = db
+      .prepare(
+        `SELECT * FROM sessions WHERE id = ? AND tenant_id = ?
+         AND status = 'em_andamento' AND excluida_em IS NULL`,
+      )
+      .get(id, tenantId);
+    if (!row) throw notFound('Sessão ativa não encontrada.');
+    const amounts = sessionAmounts(row);
+    if (amounts.pendenteCentavos <= 0) {
+      throw conflict('Esta sessão já está totalmente paga.', 'sessao_ja_paga');
+    }
+    const now = nowIso();
+    db.prepare(
+      `UPDATE sessions SET pagamento_adiantado = 1, valor_adiantado_centavos = ?,
+       forma_adiantado = ?, adiantado_em = ?, pago = 1, forma_pagamento = ?, pago_em = ?,
+       atualizado_em = ? WHERE id = ? AND tenant_id = ?`,
+    ).run(
+      amounts.totalCentavos,
+      input.forma_pagamento,
+      now,
+      input.forma_pagamento,
+      now,
+      now,
+      id,
+      tenantId,
+    );
+    logEvent(db, tenantId, id, 'pagamento', operator.id, {
+      valorCentavos: amounts.pendenteCentavos,
+      valorTotalCentavos: amounts.totalCentavos,
+      formaPagamento: input.forma_pagamento,
+      pagoEm: now,
+      origem: 'pagamento_antecipado_scan',
+    });
+  });
+  run();
+  return getSessionById(db, tenantId, id);
+}
+
+export function editSessionClient(db, tenantId, id, input, operator) {
+  const cliente = normalizeClientName(input.cliente_nome);
+  const run = db.transaction(() => {
+    const row = db
+      .prepare('SELECT * FROM sessions WHERE id = ? AND tenant_id = ? AND excluida_em IS NULL')
+      .get(id, tenantId);
+    if (!row) throw notFound('Sessão não encontrada.');
+    if ((row.cliente_nome || null) === cliente) return;
+    db.prepare('UPDATE sessions SET cliente_nome = ?, atualizado_em = ? WHERE id = ? AND tenant_id = ?')
+      .run(cliente, nowIso(), id, tenantId);
+    logEvent(db, tenantId, id, 'edicao_cliente', operator.id, {
+      clienteAnterior: row.cliente_nome || null,
+      clienteNovo: cliente,
+    });
+  });
+  run();
+  return getSessionById(db, tenantId, id);
+}
+
+export function editSessionValue(db, tenantId, id, input, operator) {
+  if (
+    !Number.isInteger(input.valor_centavos) ||
+    input.valor_centavos < 0 ||
+    input.valor_centavos > 1_000_000
+  ) {
     throw badRequest('Informe um valor válido.');
   }
   const run = db.transaction(() => {
     const row = db
-      .prepare("SELECT * FROM sessions WHERE id = ? AND excluida_em IS NULL")
-      .get(id);
+      .prepare('SELECT * FROM sessions WHERE id = ? AND tenant_id = ? AND excluida_em IS NULL')
+      .get(id, tenantId);
     if (!row) throw notFound('Sessão não encontrada.');
     if (row.status !== 'encerrada') {
       throw conflict('O valor só pode ser editado em sessões encerradas.');
     }
     if (row.valor_centavos === input.valor_centavos) return;
-    db.prepare('UPDATE sessions SET valor_centavos = ?, atualizado_em = ? WHERE id = ?').run(
-      input.valor_centavos,
-      nowIso(),
-      id,
-    );
-    logEvent(db, id, 'edicao_valor', operator.id, {
+    db.prepare(
+      'UPDATE sessions SET valor_centavos = ?, atualizado_em = ? WHERE id = ? AND tenant_id = ?',
+    ).run(input.valor_centavos, nowIso(), id, tenantId);
+    logEvent(db, tenantId, id, 'edicao_valor', operator.id, {
       valorAnteriorCentavos: row.valor_centavos,
       valorNovoCentavos: input.valor_centavos,
     });
   });
   run();
-  return getSessionById(db, id);
+  return getSessionById(db, tenantId, id);
 }
 
-export function cancelSession(db, id, input, operator) {
+export function cancelSession(db, tenantId, id, input, operator) {
   const motivo = String(input.motivo || '').trim();
   if (motivo.length < 3) throw badRequest('Informe o motivo do cancelamento.');
 
   const run = db.transaction(() => {
     const row = db
-      .prepare("SELECT * FROM sessions WHERE id = ? AND excluida_em IS NULL")
-      .get(id);
+      .prepare('SELECT * FROM sessions WHERE id = ? AND tenant_id = ? AND excluida_em IS NULL')
+      .get(id, tenantId);
     if (!row) throw notFound('Sessão não encontrada.');
     if (row.status === 'cancelada') throw conflict('Sessão já está cancelada.');
 
@@ -375,15 +490,14 @@ export function cancelSession(db, id, input, operator) {
     db.prepare(
       `UPDATE sessions SET status = 'cancelada', motivo_cancelamento = ?,
        encerrado_em = ?, duracao_segundos = ?, atualizado_em = ?, pago = 0,
-       forma_pagamento = NULL, pago_em = NULL WHERE id = ?`,
-    ).run(motivo, endedAt, duration, nowIso(), id);
+       forma_pagamento = NULL, pago_em = NULL WHERE id = ? AND tenant_id = ?`,
+    ).run(motivo, endedAt, duration, nowIso(), id, tenantId);
     if (row.status === 'em_andamento') {
-      db.prepare("UPDATE carts SET status = 'disponivel', atualizado_em = ? WHERE id = ?").run(
-        nowIso(),
-        row.cart_id,
-      );
+      db.prepare(
+        "UPDATE carts SET status = 'disponivel', atualizado_em = ? WHERE id = ? AND tenant_id = ?",
+      ).run(nowIso(), row.cart_id, tenantId);
     }
-    logEvent(db, id, 'cancelamento', operator.id, {
+    logEvent(db, tenantId, id, 'cancelamento', operator.id, {
       motivo,
       valorCentavos: row.valor_centavos,
       valorAdiantadoCentavos: row.valor_adiantado_centavos || 0,
@@ -393,25 +507,26 @@ export function cancelSession(db, id, input, operator) {
     });
   });
   run();
-  return getSessionById(db, id);
+  return getSessionById(db, tenantId, id);
 }
 
-export function deleteSession(db, id, input, operator) {
+export function deleteSession(db, tenantId, id, input, operator) {
   const run = db.transaction(() => {
     const row = db
-      .prepare("SELECT * FROM sessions WHERE id = ? AND excluida_em IS NULL")
-      .get(id);
+      .prepare('SELECT * FROM sessions WHERE id = ? AND tenant_id = ? AND excluida_em IS NULL')
+      .get(id, tenantId);
     if (!row) throw notFound('Sessão não encontrada.');
     if (row.status === 'em_andamento') {
       throw conflict('Encerre ou cancele a sessão antes de excluí-la.');
     }
     const now = nowIso();
     db.prepare(
-      'UPDATE sessions SET excluida_em = ?, excluida_por = ?, atualizado_em = ? WHERE id = ?',
-    ).run(now, operator.id, now, id);
-    logEvent(db, id, 'exclusao', operator.id, {
+      `UPDATE sessions SET excluida_em = ?, excluida_por = ?, atualizado_em = ?
+       WHERE id = ? AND tenant_id = ?`,
+    ).run(now, operator.id, now, id, tenantId);
+    logEvent(db, tenantId, id, 'exclusao', operator.id, {
       motivo: String(input?.motivo || '').trim() || 'Exclusão administrativa',
-      cliente: row.cliente_nome,
+      cliente: row.cliente_nome || null,
       valorCentavos: row.valor_centavos,
       pago: Boolean(row.pago),
     });
@@ -419,9 +534,9 @@ export function deleteSession(db, id, input, operator) {
   run();
 }
 
-export function listSessions(db, filters) {
-  const where = ['1 = 1'];
-  const params = [];
+export function listSessions(db, tenantId, filters) {
+  const where = ['s.tenant_id = ?'];
+  const params = [tenantId];
   if (filters.from) {
     where.push('s.iniciado_em >= ?');
     params.push(filters.from);

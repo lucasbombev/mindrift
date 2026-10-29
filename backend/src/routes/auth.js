@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
   authPayload,
   clearRefreshCookie,
+  getUserWithTenant,
   hashPassword,
   publicUser,
   setRefreshCookie,
@@ -11,13 +12,14 @@ import {
   signRefreshToken,
   verifyPassword,
   verifyRefreshToken,
+  USER_WITH_TENANT_SELECT,
 } from '../services/auth.js';
 import { requireAuth } from '../middleware/auth.js';
-import { badRequest, unauthorized } from '../utils/errors.js';
+import { badRequest, forbidden, unauthorized } from '../utils/errors.js';
 import { nowIso } from '../utils/time.js';
 
 const loginSchema = z.object({
-  username: z.string().trim().min(1, 'Informe o usuário.').max(80),
+  username: z.string().trim().min(1, 'Informe o usuário ou e-mail.').max(160),
   password: z.string().min(1, 'Informe a senha.').max(200),
 });
 
@@ -44,6 +46,24 @@ export function validateNewPassword(senhaNova, senhaAtual, username) {
   }
 }
 
+function findLoginUser(db, identifier) {
+  return db
+    .prepare(
+      `${USER_WITH_TENANT_SELECT}
+       WHERE u.username = ? COLLATE NOCASE
+          OR (u.email IS NOT NULL AND lower(u.email) = lower(?))
+       LIMIT 1`,
+    )
+    .get(identifier, identifier);
+}
+
+function assertTenantCanLogin(row) {
+  if (row.role === 'superadmin') return;
+  if (!row.tenant_id || !row.tenant_ativo) {
+    throw forbidden('Este negócio está inativo. Fale com o suporte.', 'negocio_inativo');
+  }
+}
+
 export function createAuthRouter(db) {
   const router = Router();
 
@@ -65,17 +85,14 @@ export function createAuthRouter(db) {
   router.post('/login', loginLimiter, async (req, res, next) => {
     try {
       const body = loginSchema.parse(req.body);
-      const row = db
-        .prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE')
-        .get(body.username.trim());
-      if (!row || !row.ativo) {
-        throw unauthorized('Usuário ou senha inválidos.');
-      }
+      const row = findLoginUser(db, body.username.trim());
+      if (!row || !row.ativo) throw unauthorized('Usuário ou senha inválidos.');
+      assertTenantCanLogin(row);
       const ok = await verifyPassword(body.password, row.senha_hash);
       if (!ok) throw unauthorized('Usuário ou senha inválidos.');
 
       db.prepare('UPDATE users SET ultimo_login_em = ? WHERE id = ?').run(nowIso(), row.id);
-      const fresh = db.prepare('SELECT * FROM users WHERE id = ?').get(row.id);
+      const fresh = getUserWithTenant(db, row.id);
       const payload = authPayload(fresh);
       setRefreshCookie(res, payload.refreshToken);
       const { refreshToken, ...response } = payload;
@@ -90,10 +107,11 @@ export function createAuthRouter(db) {
       const token = req.cookies?.drift_refresh;
       if (!token) throw unauthorized();
       const payload = verifyRefreshToken(token);
-      const row = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(payload.sub));
+      const row = getUserWithTenant(db, Number(payload.sub));
       if (!row || !row.ativo || Number(payload.tv) !== Number(row.token_version)) {
         throw unauthorized();
       }
+      assertTenantCanLogin(row);
       const newRefresh = signRefreshToken(row);
       setRefreshCookie(res, newRefresh);
       res.json({ accessToken: signAccessToken(row), user: publicUser(row) });
@@ -128,7 +146,7 @@ export function createAuthRouter(db) {
          token_version = token_version + 1, atualizado_em = ? WHERE id = ?`,
       ).run(hash, now, row.id);
 
-      const fresh = db.prepare('SELECT * FROM users WHERE id = ?').get(row.id);
+      const fresh = getUserWithTenant(db, row.id);
       setRefreshCookie(res, signRefreshToken(fresh));
       res.json({
         accessToken: signAccessToken(fresh),

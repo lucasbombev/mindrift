@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
-import { brl, formatTime, statusLabel } from '../lib/format.js';
+import { brl, clientName, formatTime, statusLabel } from '../lib/format.js';
 import { useToast } from '../context/ToastContext.jsx';
 import { CartArt } from '../components/CartCard.jsx';
 import {
@@ -28,9 +28,10 @@ const STATUS_OPTIONS = [
   { value: 'manutencao', label: 'Manutenção' },
 ];
 
-function CartFormModal({ cart, onClose, onSaved }) {
+function CartFormModal({ cart, categories, onClose, onSaved }) {
   const isEdit = Boolean(cart?.id);
   const [codigo, setCodigo] = useState(cart?.codigo || '');
+  const [categoryId, setCategoryId] = useState(cart?.categoryId || categories[0]?.id || '');
   const active = Boolean(cart?.sessaoAtiva);
   const [status, setStatus] = useState(
     cart?.status === 'em_uso' ? 'disponivel' : cart?.status || 'disponivel',
@@ -83,10 +84,12 @@ function CartFormModal({ cart, onClose, onSaved }) {
     event.preventDefault();
     setError('');
     if (!codigo.trim()) return setError('Informe o código do carrinho.');
+    if (!categoryId) return setError('Escolha a categoria do carrinho.');
     setLoading(true);
     try {
       const formData = new FormData();
       formData.append('codigo', codigo.trim().toUpperCase());
+      formData.append('category_id', String(categoryId));
       if (!active) formData.append('status', status);
       formData.append('observacao', observacao.trim());
       if (file) formData.append('foto', file);
@@ -179,26 +182,41 @@ function CartFormModal({ cart, onClose, onSaved }) {
               disabled={loading}
             />
           </Field>
-          <Field
-            label="Status"
-            htmlFor="cart-status"
-            hint={active ? 'Em uso até a sessão terminar.' : 'O início do aluguel muda para em uso.'}
-          >
+          <Field label="Categoria" htmlFor="cart-category" required>
             <Select
-              id="cart-status"
-              value={active ? 'em_uso' : status}
-              onChange={(event) => setStatus(event.target.value)}
-              disabled={loading || active}
+              id="cart-category"
+              value={categoryId}
+              onChange={(event) => setCategoryId(event.target.value)}
+              disabled={loading || categories.length === 0}
             >
-              {active && <option value="em_uso">Em uso</option>}
-              {STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+              <option value="">Escolha…</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.icone} {category.nome}{category.ativo ? '' : ' (inativa)'}
                 </option>
               ))}
             </Select>
           </Field>
         </div>
+        <Field
+          label="Status"
+          htmlFor="cart-status"
+          hint={active ? 'Em uso até a sessão terminar.' : 'O início do aluguel muda para em uso.'}
+        >
+          <Select
+            id="cart-status"
+            value={active ? 'em_uso' : status}
+            onChange={(event) => setStatus(event.target.value)}
+            disabled={loading || active}
+          >
+            {active && <option value="em_uso">Em uso</option>}
+            {STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
 
         <Field label="Observação" htmlFor="cart-obs" hint="Opcional. Ex.: bateria nova, pneu traseiro.">
           <Textarea
@@ -217,6 +235,7 @@ function CartFormModal({ cart, onClose, onSaved }) {
 
 export function CartsPage() {
   const [carts, setCarts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formCart, setFormCart] = useState(null);
@@ -229,8 +248,12 @@ export function CartsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.get('/carts');
+      const [data, categoryData] = await Promise.all([
+        api.get('/carts'),
+        api.get('/categories?todos=1'),
+      ]);
       setCarts(data.items || []);
+      setCategories(categoryData.items || []);
       setError('');
     } catch (err) {
       setError(err.message);
@@ -338,7 +361,10 @@ export function CartsPage() {
                   <div className="admin-cart__head">
                     <div>
                       <h2>{cart.codigo}</h2>
-                      <span>{STATUS_OPTIONS.find((item) => item.value === cart.status)?.label || statusLabel(cart.status)}</span>
+                      <span className="admin-cart__category" style={{ '--category-color': cart.category?.cor }}>
+                        {cart.category?.icone} {cart.category?.nome || 'Sem categoria'} ·{' '}
+                        {STATUS_OPTIONS.find((item) => item.value === cart.status)?.label || statusLabel(cart.status)}
+                      </span>
                     </div>
                     <div className="admin-cart__utils">
                       <IconButton
@@ -357,7 +383,7 @@ export function CartsPage() {
 
                   {active ? (
                     <div className="admin-cart__active">
-                      <Badge tone="blue">Em uso por {cart.sessaoAtiva.clienteNome}</Badge>
+                      <Badge tone="blue">Em uso por {clientName(cart.sessaoAtiva.clienteNome)}</Badge>
                       <span>Termina às {formatTime(cart.sessaoAtiva.fimPrevistoEm)}</span>
                     </div>
                   ) : (
@@ -399,6 +425,7 @@ export function CartsPage() {
       {(createOpen || formCart) && (
         <CartFormModal
           cart={formCart}
+          categories={categories}
           onClose={() => {
             setCreateOpen(false);
             setFormCart(null);

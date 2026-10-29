@@ -19,11 +19,12 @@ import {
 } from '../components/ui.jsx';
 import { Icon } from '../components/Icons.jsx';
 
-function PlanModal({ plan, onClose, onSaved }) {
+function PlanModal({ plan, categories, onClose, onSaved }) {
   const isEdit = Boolean(plan?.id);
   const [nome, setNome] = useState(plan?.nome || '');
   const [minutos, setMinutos] = useState(plan?.minutos || 10);
   const [valor, setValor] = useState(plan?.valorCentavos ?? 800);
+  const [categoryId, setCategoryId] = useState(plan?.categoryId || '');
   const [ativo, setAtivo] = useState(plan?.ativo ?? true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -43,6 +44,7 @@ function PlanModal({ plan, onClose, onSaved }) {
         nome: nome.trim(),
         minutos: Number(minutos),
         valor_centavos: valor,
+        category_id: categoryId ? Number(categoryId) : null,
         ativo,
       };
       if (isEdit) await api.patch(`/plans/${plan.id}`, payload);
@@ -99,6 +101,22 @@ function PlanModal({ plan, onClose, onSaved }) {
             <MoneyInput id="plan-valor" valueCents={valor} onChangeCents={setValor} disabled={loading} />
           </Field>
         </div>
+        <Field label="Categoria" htmlFor="plan-category" hint="Sem categoria = vale para todas as categorias do negócio.">
+          <select
+            id="plan-category"
+            className="input"
+            value={categoryId}
+            onChange={(event) => setCategoryId(event.target.value)}
+            disabled={loading}
+          >
+            <option value="">Todas as categorias</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.icone} {category.nome}{category.ativo ? '' : ' (inativa)'}
+              </option>
+            ))}
+          </select>
+        </Field>
         <Toggle
           checked={ativo}
           onChange={setAtivo}
@@ -118,6 +136,7 @@ function PlanModal({ plan, onClose, onSaved }) {
 
 export function PlansPage() {
   const [plans, setPlans] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [modal, setModal] = useState(null);
@@ -128,8 +147,12 @@ export function PlansPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.get('/plans?todos=1');
+      const [data, categoryData] = await Promise.all([
+        api.get('/plans?todos=1'),
+        api.get('/categories?todos=1'),
+      ]);
       setPlans(data.items || []);
+      setCategories(categoryData.items || []);
       setError('');
     } catch (err) {
       setError(err.message);
@@ -216,6 +239,10 @@ export function PlansPage() {
               <span className="plan-admin__per">
                 {formatDurationMinutes(plan.minutos)} de pista
                 {plan.minutos > 0 && ` · ${brl(Math.round(plan.valorCentavos / plan.minutos))}/min`}
+                <br />
+                <span className="plan-admin__category">
+                  {plan.categoryId ? `${plan.categoryIcone || '🏁'} ${plan.categoryNome}` : 'Todas as categorias'}
+                </span>
               </span>
               <div className="plan-admin__actions">
                 <Button
@@ -256,6 +283,7 @@ export function PlansPage() {
       {modal && (
         <PlanModal
           plan={modal.plan}
+          categories={categories}
           onClose={() => setModal(null)}
           onSaved={() => {
             setModal(null);

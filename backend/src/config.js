@@ -52,6 +52,10 @@ export const config = {
   keyPath: process.env.HTTPS_KEY || path.resolve(BACKEND_ROOT, 'certs', 'server.key'),
   caCertPath: path.resolve(BACKEND_ROOT, 'certs', 'local-ca.crt'),
   version: '1.0.0',
+  superadminUsername: process.env.SUPERADMIN_USERNAME || 'superadmin',
+  superadminPassword: process.env.SUPERADMIN_PASSWORD || 'superadmin123',
+  superadminName: process.env.SUPERADMIN_NAME || 'Superadministrador',
+  superadminEmail: process.env.SUPERADMIN_EMAIL || '',
 };
 
 export function assertRuntimeDirs() {

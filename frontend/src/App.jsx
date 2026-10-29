@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import { LoginPage } from './pages/LoginPage.jsx';
+import { SignupPage } from './pages/SignupPage.jsx';
 import { AppLayout } from './components/Layout.jsx';
 import { ForcedPasswordChange } from './components/ChangePassword.jsx';
 import { Button, LoadingScreen, PageHeader, Spinner } from './components/ui.jsx';
@@ -15,6 +16,10 @@ import { CashPage } from './pages/CashPage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { ChangePasswordPage } from './pages/ChangePasswordPage.jsx';
 import { PwaUpdateBanner } from './components/PwaUpdateBanner.jsx';
+import { SuperadminPage } from './pages/SuperadminPage.jsx';
+import { CategoriesPage } from './pages/CategoriesPage.jsx';
+import { QrCodesPage } from './pages/QrCodesPage.jsx';
+import { ScanPage } from './pages/ScanPage.jsx';
 
 function AdminOnly({ children }) {
   const { isAdmin } = useAuth();
@@ -77,14 +82,26 @@ function AppRoutes() {
 
   if (loading) return <BootSplash />;
   if (bootError && !user) return <ServerUnavailable />;
-  if (!user) return <LoginPage />;
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/cadastro" element={<SignupPage />} />
+        <Route path="*" element={<LoginPage />} />
+      </Routes>
+    );
+  }
   if (user.mustChangePassword) return <ForcedPasswordChange />;
+  if (user.role === 'superadmin') return <SuperadminPage />;
 
   return (
     <Routes>
       <Route element={<AppLayout />}>
         <Route index element={<DashboardPage />} />
+        <Route path="scan" element={<ScanPage />} />
+        <Route path="scan/:qrToken" element={<ScanPage />} />
         <Route path="historico" element={<HistoryPage />} />
+        <Route path="login" element={<Navigate to="/" replace />} />
+        <Route path="cadastro" element={<Navigate to="/" replace />} />
         <Route path="alterar-senha" element={<ChangePasswordPage />} />
         <Route
           path="relatorios"
@@ -107,6 +124,22 @@ function AppRoutes() {
           element={
             <AdminOnly>
               <PlansPage />
+            </AdminOnly>
+          }
+        />
+        <Route
+          path="categorias"
+          element={
+            <AdminOnly>
+              <CategoriesPage />
+            </AdminOnly>
+          }
+        />
+        <Route
+          path="qrcodes"
+          element={
+            <AdminOnly>
+              <QrCodesPage />
             </AdminOnly>
           }
         />

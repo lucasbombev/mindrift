@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
-import { brl, formatDateTime, formatDuration, formatTime, paymentLabel, parseMoneyToCents } from '../lib/format.js';
+import { brl, clientName, formatDateTime, formatDuration, formatTime, paymentLabel, parseMoneyToCents } from '../lib/format.js';
 import { useToast } from '../context/ToastContext.jsx';
 import {
   Badge,
@@ -46,6 +46,10 @@ function usePlans(open = true) {
     };
   }, [open]);
   return { plans, loading, error };
+}
+
+function applicablePlans(plans, categoryId) {
+  return plans.filter((plan) => !plan.categoryId || plan.categoryId === categoryId);
 }
 
 function selectedPlan(plans, pricing) {
@@ -164,13 +168,20 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
   const { toast } = useToast();
   const touched = useRef(false);
 
-  useEffect(() => {
-    if (plans.length && !pricing.planoId && !touched.current) {
-      setPricing((current) => ({ ...current, modo: 'plano', planoId: plans[0].id }));
-    }
-  }, [plans, pricing.planoId]);
+  const selectedCart = carts.find((cart) => cart.id === Number(cartId));
+  const availablePlans = applicablePlans(plans, selectedCart?.categoryId);
 
-  const result = pricingResult(plans, pricing);
+  useEffect(() => {
+    if (!availablePlans.length) return;
+    const currentIsValid = availablePlans.some((plan) => plan.id === Number(pricing.planoId));
+    if (!currentIsValid) {
+      setPricing((current) => ({ ...current, modo: 'plano', planoId: availablePlans[0].id }));
+      touched.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartId, plans.length, selectedCart?.categoryId]);
+
+  const result = pricingResult(availablePlans, pricing);
   const predictedEnd = new Date(Date.now() + result.minutes * 60_000);
 
   const handlePricing = (value) => {
@@ -182,21 +193,20 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
     event.preventDefault();
     setError('');
     if (!cartId) return setError('Escolha um carrinho.');
-    if (cliente.trim().length < 2) return setError('Informe o nome do cliente.');
     if (!result.valid) return setError('Escolha um plano válido ou informe minutos e valor.');
     setLoading(true);
     try {
       const payload = {
         cart_id: Number(cartId),
-        cliente_nome: cliente.trim(),
+        cliente_nome: cliente.trim() || null,
         observacao: observacao.trim() || undefined,
         pagamento_adiantado: pagamentoAdiantado,
         forma_pagamento: pagamentoAdiantado ? formaPagamento : null,
-        ...pricingPayload(pricing, plans),
+        ...pricingPayload(pricing, availablePlans),
       };
       const data = await api.post('/sessions', payload);
       toast(
-        `Aluguel de ${data.sessao.clienteNome} iniciado no ${data.sessao.cartCodigo}.${
+        `Aluguel de ${clientName(data.sessao.clienteNome)} iniciado no ${data.sessao.cartCodigo}.${
           pagamentoAdiantado ? ` Recebido adiantado: ${brl(data.sessao.valorAdiantadoCentavos)}.` : ' Pagamento no final.'
         }`,
         { type: 'success', title: 'Timer rodando' },
@@ -240,20 +250,22 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
                 className={`cart-chip ${Number(cartId) === cart.id ? 'is-selected' : ''}`}
                 onClick={() => setCartId(cart.id)}
                 disabled={loading}
+                style={{ '--category-color': cart.category?.cor }}
               >
                 <span className="cart-chip__dot" />
                 <strong>{cart.codigo}</strong>
+                <small>{cart.category?.icone} {cart.category?.nome}</small>
               </button>
             ))}
           </div>
         </Field>
 
-        <Field label="Nome do cliente" htmlFor="cliente" required>
+        <Field label="Nome do cliente (opcional)" htmlFor="cliente" hint="Pode iniciar sem nome e preencher depois no histórico.">
           <Input
             id="cliente"
             value={cliente}
             onChange={(event) => setCliente(event.target.value)}
-            placeholder="Ex.: João"
+            placeholder="Ex.: João (ou deixe em branco)"
             maxLength={80}
             autoComplete="off"
             disabled={loading}
@@ -263,7 +275,7 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
         <div>
           <span className="field__label">Plano</span>
           <PricingSelector
-            plans={plans}
+            plans={availablePlans}
             pricing={pricing}
             setPricing={handlePricing}
             disabled={loading}
@@ -339,6 +351,7 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
 
 export function RenewSessionModal({ open, onClose, session, offset = 0, onSuccess }) {
   const { plans, loading: plansLoading, error: plansError } = usePlans(open);
+  const availablePlans = applicablePlans(plans, session.cartCategoryId);
   const [pricing, setPricing] = useState(initialPricing);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -346,12 +359,16 @@ export function RenewSessionModal({ open, onClose, session, offset = 0, onSucces
   const touched = useRef(false);
 
   useEffect(() => {
-    if (plans.length && !pricing.planoId && !touched.current) {
-      setPricing((current) => ({ ...current, modo: 'plano', planoId: plans[0].id }));
+    if (!availablePlans.length) return;
+    const currentIsValid = availablePlans.some((plan) => plan.id === Number(pricing.planoId));
+    if (!currentIsValid) {
+      setPricing((current) => ({ ...current, modo: 'plano', planoId: availablePlans[0].id }));
+      touched.current = false;
     }
-  }, [plans, pricing.planoId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availablePlans.length, session.cartCategoryId]);
 
-  const result = pricingResult(plans, pricing);
+  const result = pricingResult(availablePlans, pricing);
   const base = Math.max(Date.now() + offset, new Date(session.fimPrevistoEm).getTime());
   const predictedEnd = new Date(base + result.minutes * 60_000);
 
@@ -361,8 +378,8 @@ export function RenewSessionModal({ open, onClose, session, offset = 0, onSucces
     setLoading(true);
     setError('');
     try {
-      const data = await api.post(`/sessions/${session.id}/renew`, pricingPayload(pricing, plans));
-      toast(`+${result.minutes} min para ${session.clienteNome}. Novo total: ${brl(data.sessao.valorCentavos)}.`, {
+      const data = await api.post(`/sessions/${session.id}/renew`, pricingPayload(pricing, availablePlans));
+      toast(`+${result.minutes} min para ${clientName(session.clienteNome)}. Novo total: ${brl(data.sessao.valorCentavos)}.`, {
         type: 'success',
         title: 'Tempo adicionado',
       });
@@ -379,7 +396,7 @@ export function RenewSessionModal({ open, onClose, session, offset = 0, onSucces
       open={open}
       onClose={onClose}
       title="Adicionar tempo"
-      subtitle={`${session.cartCodigo} · ${session.clienteNome}`}
+      subtitle={`${session.cartCodigo} · ${clientName(session.clienteNome)}`}
       icon="timer"
       dismissible={!loading}
       footer={
@@ -407,7 +424,7 @@ export function RenewSessionModal({ open, onClose, session, offset = 0, onSucces
         <div>
           <span className="field__label">Adicionar</span>
           <PricingSelector
-            plans={plans}
+            plans={availablePlans}
             pricing={pricing}
             setPricing={(value) => {
               touched.current = true;
@@ -446,6 +463,7 @@ export function EndSessionModal({ open, onClose, session, offset = 0, onSuccess 
   const [forma, setForma] = useState(
     session.formaPagamento || session.formaAdiantado || 'pix',
   );
+  const [destino, setDestino] = useState('disponivel');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { toast } = useToast();
@@ -463,8 +481,14 @@ export function EndSessionModal({ open, onClose, session, offset = 0, onSuccess 
       const data = await api.post(`/sessions/${session.id}/end`, {
         pago: receber,
         forma_pagamento: receber ? (jaPago ? formaFinal : forma) : null,
+        cart_destino: destino,
       });
       let message;
+      const destinationLabel = {
+        disponivel: 'voltou para disponível',
+        carregando: 'foi para carregamento',
+        manutencao: 'foi para manutenção',
+      }[destino];
       if (jaPago) {
         message = `Sessão encerrada. O pagamento de ${brl(session.valorPagoCentavos)} já havia sido recebido adiantado.`;
       } else if (pago) {
@@ -472,6 +496,7 @@ export function EndSessionModal({ open, onClose, session, offset = 0, onSuccess 
       } else {
         message = `Sessão encerrada com ${brl(restante)} pendente.`;
       }
+      message += ` Carrinho ${destinationLabel}.`;
       toast(message, { type: 'success', title: 'Aluguel encerrado' });
       onSuccess?.(data.sessao);
     } catch (err) {
@@ -486,7 +511,7 @@ export function EndSessionModal({ open, onClose, session, offset = 0, onSuccess 
       open={open}
       onClose={onClose}
       title="Encerrar aluguel"
-      subtitle={`${session.cartCodigo} · ${session.clienteNome}`}
+      subtitle={`${session.cartCodigo} · ${clientName(session.clienteNome)}`}
       icon="stop"
       dismissible={!loading}
       footer={
@@ -567,6 +592,28 @@ export function EndSessionModal({ open, onClose, session, offset = 0, onSuccess 
             )}
           </>
         )}
+
+        <div className="destination-block">
+          <span className="field__label">Destino do carrinho</span>
+          <p className="muted small">Escolha em 1 toque o que acontece com o equipamento.</p>
+          <div className="destination-grid">
+            <button type="button" className={`destination-btn ${destino === 'disponivel' ? 'is-selected' : ''}`} onClick={() => setDestino('disponivel')} disabled={loading}>
+              <Icon name="check" size={22} />
+              <strong>Voltar para Disponível</strong>
+              <small>Pronto para alugar</small>
+            </button>
+            <button type="button" className={`destination-btn ${destino === 'carregando' ? 'is-selected' : ''}`} onClick={() => setDestino('carregando')} disabled={loading}>
+              <Icon name="refresh" size={22} />
+              <strong>Enviar para Carregamento</strong>
+              <small>Check-in na carga</small>
+            </button>
+            <button type="button" className={`destination-btn ${destino === 'manutencao' ? 'is-selected' : ''}`} onClick={() => setDestino('manutencao')} disabled={loading}>
+              <Icon name="settings" size={22} />
+              <strong>Enviar para Manutenção</strong>
+              <small>Precisa de cuidado</small>
+            </button>
+          </div>
+        </div>
       </div>
     </Modal>
   );
@@ -614,7 +661,7 @@ export function PaymentModal({ open, onClose, session, canUnpay, onSuccess }) {
       open={open}
       onClose={onClose}
       title="Pagamento"
-      subtitle={`${session.cartCodigo} · ${session.clienteNome}`}
+      subtitle={`${session.cartCodigo} · ${clientName(session.clienteNome)}`}
       icon="cash"
       dismissible={!loading}
       footer={
@@ -716,7 +763,7 @@ export function ValueModal({ open, onClose, session, onSuccess }) {
       open={open}
       onClose={onClose}
       title="Editar valor"
-      subtitle={`${session.cartCodigo} · ${session.clienteNome}`}
+      subtitle={`${session.cartCodigo} · ${clientName(session.clienteNome)}`}
       icon="edit"
       dismissible={!loading}
       footer={
@@ -774,7 +821,7 @@ export function CancelSessionModal({ open, onClose, session, onSuccess }) {
       open={open}
       onClose={onClose}
       title="Cancelar sessão"
-      subtitle={`${session.cartCodigo} · ${session.clienteNome}`}
+      subtitle={`${session.cartCodigo} · ${clientName(session.clienteNome)}`}
       icon="alert"
       dismissible={!loading}
       footer={
@@ -818,6 +865,8 @@ function eventDescription(event) {
       return payload.motivo || 'Sessão cancelada';
     case 'edicao_valor':
       return `${brl(payload.valorAnteriorCentavos || 0)} → ${brl(payload.valorNovoCentavos || 0)}`;
+    case 'edicao_cliente':
+      return `${clientName(payload.clienteAnterior)} → ${clientName(payload.clienteNovo)}`;
     case 'exclusao':
       return payload.motivo || 'Excluída do histórico';
     default:
@@ -832,6 +881,7 @@ const EVENT_LABEL = {
   pagamento: 'Pagamento',
   cancelamento: 'Cancelamento',
   edicao_valor: 'Valor editado',
+  edicao_cliente: 'Cliente editado',
   exclusao: 'Exclusão',
 };
 
@@ -876,7 +926,7 @@ export function SessionDetailsModal({ open, onClose, sessionId }) {
       open={open}
       onClose={onClose}
       title="Detalhes da sessão"
-      subtitle={session ? `${session.cartCodigo} · ${session.clienteNome}` : 'Carregando…'}
+      subtitle={session ? `${session.cartCodigo} · ${clientName(session.clienteNome)}` : 'Carregando…'}
       icon="receipt"
       size="md"
     >
@@ -998,3 +1048,122 @@ export function SessionDetailsModal({ open, onClose, sessionId }) {
 }
 
 export { PAYMENT_OPTIONS };
+
+export function PayActiveModal({ open, onClose, session, onSuccess }) {
+  const restante = Math.max(0, Number(session.valorPendenteCentavos) || 0);
+  const [forma, setForma] = useState(session.formaPagamento || session.formaAdiantado || 'pix');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { toast } = useToast();
+
+  const submit = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await api.post(`/sessions/${session.id}/pay-active`, { forma_pagamento: forma });
+      toast(`Recebido ${brl(restante)}. A sessão continua rodando.`, {
+        type: 'success',
+        title: 'Pagamento registrado',
+      });
+      onSuccess?.(data.sessao);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Registrar pagamento"
+      subtitle={`${session.cartCodigo} · ${clientName(session.clienteNome)}`}
+      icon="cash"
+      dismissible={!loading}
+      footer={
+        <Button size="lg" loading={loading} icon="check" onClick={submit} block>
+          Receber {brl(restante)} agora
+        </Button>
+      }
+    >
+      <div className="stack">
+        <InlineError>{error}</InlineError>
+        <div className="end-summary">
+          <div><span>Total</span><strong>{brl(session.valorCentavos)}</strong></div>
+          <div><span>Já recebido</span><strong>{brl(session.valorPagoCentavos)}</strong></div>
+          <div><span>Restante</span><strong>{brl(restante)}</strong></div>
+        </div>
+        <Field label="Forma de pagamento">
+          <Segmented
+            options={PAYMENT_OPTIONS}
+            value={forma}
+            onChange={setForma}
+            ariaLabel="Forma de pagamento"
+          />
+        </Field>
+        <InfoNote icon="info">
+          O valor entra no caixa agora. Se o aluguel for renovado, o novo adicional continua pendente.
+        </InfoNote>
+      </div>
+    </Modal>
+  );
+}
+
+export function EditClientModal({ open, onClose, session, onSuccess }) {
+  const [cliente, setCliente] = useState(session?.clienteNome || '');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (open) setCliente(session?.clienteNome || '');
+  }, [open, session?.clienteNome, session?.id]);
+
+  const submit = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await api.patch(`/sessions/${session.id}/client`, {
+        cliente_nome: cliente.trim() || null,
+      });
+      toast('Nome do cliente atualizado.', { type: 'success' });
+      onSuccess?.(data.sessao);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Editar nome do cliente"
+      subtitle={`${session.cartCodigo} · ${clientName(session.clienteNome)}`}
+      icon="user"
+      dismissible={!loading}
+      footer={
+        <Button size="lg" loading={loading} icon="check" onClick={submit} block>
+          Salvar nome
+        </Button>
+      }
+    >
+      <div className="stack">
+        <InlineError>{error}</InlineError>
+        <Field label="Nome do cliente" htmlFor="edit-client" hint="Deixe em branco para ficar como não informado.">
+          <Input
+            id="edit-client"
+            value={cliente}
+            onChange={(event) => setCliente(event.target.value)}
+            maxLength={80}
+            autoFocus
+            disabled={loading}
+          />
+        </Field>
+        <InfoNote icon="history">A alteração fica registrada no histórico da sessão.</InfoNote>
+      </div>
+    </Modal>
+  );
+}

@@ -7,37 +7,37 @@ function zeroMethods() {
   return { dinheiro: 0, pix: 0, cartao: 0, outro: 0 };
 }
 
-function paymentRowsInRange(db, start, end) {
+function paymentRowsInRange(db, tenantId, start, end) {
   return db
     .prepare(
       `SELECT s.*, c.codigo AS cart_codigo, u.nome AS operador_nome
        FROM sessions s
        JOIN carts c ON c.id = s.cart_id
        LEFT JOIN users u ON u.id = s.operador_id
-       WHERE s.excluida_em IS NULL AND s.status != 'cancelada'
+       WHERE s.tenant_id = ? AND s.excluida_em IS NULL AND s.status != 'cancelada'
          AND (
            (s.valor_adiantado_centavos > 0 AND s.adiantado_em >= ? AND s.adiantado_em < ?)
            OR (s.pago = 1 AND s.pago_em >= ? AND s.pago_em < ?)
          )`,
     )
-    .all(start, end, start, end);
+    .all(tenantId, start, end, start, end);
 }
 
-function receiptsInRange(db, start, end) {
-  return filterReceipts(paymentRowsInRange(db, start, end).flatMap(buildReceipts), start, end)
+function receiptsInRange(db, tenantId, start, end) {
+  return filterReceipts(paymentRowsInRange(db, tenantId, start, end).flatMap(buildReceipts), start, end)
     .sort((a, b) => a.data.localeCompare(b.data));
 }
 
-export function getCashSummary(db, dateKey) {
+export function getCashSummary(db, tenantId, dateKey) {
   const { start, end } = dayBounds(dateKey);
   const closure = db
     .prepare(
       `SELECT cc.*, u.nome AS usuario_nome FROM cash_closures cc
-       LEFT JOIN users u ON u.id = cc.usuario_id WHERE cc.data = ?`,
+       LEFT JOIN users u ON u.id = cc.usuario_id WHERE cc.tenant_id = ? AND cc.data = ?`,
     )
-    .get(dateKey);
+    .get(tenantId, dateKey);
 
-  const receipts = receiptsInRange(db, start, end);
+  const receipts = receiptsInRange(db, tenantId, start, end);
 
   const totals = zeroMethods();
   let total = 0;
@@ -68,11 +68,11 @@ export function getCashSummary(db, dateKey) {
        FROM sessions s
        JOIN carts c ON c.id = s.cart_id
        LEFT JOIN users u ON u.id = s.operador_id
-       WHERE s.status = 'encerrada' AND s.pago = 0 AND s.excluida_em IS NULL
+       WHERE s.tenant_id = ? AND s.status = 'encerrada' AND s.pago = 0 AND s.excluida_em IS NULL
          AND s.encerrado_em >= ? AND s.encerrado_em < ?
        ORDER BY s.encerrado_em ASC`,
     )
-    .all(start, end);
+    .all(tenantId, start, end);
   const pendingItems = pendingRows
     .map((row) => ({ row, restante: sessionAmounts(row).pendenteCentavos }))
     .filter((item) => item.restante > 0);
@@ -82,18 +82,18 @@ export function getCashSummary(db, dateKey) {
       `SELECT COUNT(*) AS qtd, COALESCE(SUM(valor_centavos), 0) AS total,
               COALESCE(SUM(duracao_segundos), 0) AS segundos
        FROM sessions
-       WHERE status = 'encerrada' AND excluida_em IS NULL
+       WHERE tenant_id = ? AND status = 'encerrada' AND excluida_em IS NULL
          AND encerrado_em >= ? AND encerrado_em < ?`,
     )
-    .get(start, end);
+    .get(tenantId, start, end);
 
   const cancelled = db
     .prepare(
       `SELECT COUNT(*) AS qtd FROM sessions
-       WHERE status = 'cancelada' AND excluida_em IS NULL
+       WHERE tenant_id = ? AND status = 'cancelada' AND excluida_em IS NULL
          AND encerrado_em >= ? AND encerrado_em < ?`,
     )
-    .get(start, end).qtd;
+    .get(tenantId, start, end).qtd;
 
   return {
     data: dateKey,
@@ -152,8 +152,8 @@ export function getCashSummary(db, dateKey) {
   };
 }
 
-export function closeCash(db, dateKey, observacao, user) {
-  const summary = getCashSummary(db, dateKey);
+export function closeCash(db, tenantId, dateKey, observacao, user) {
+  const summary = getCashSummary(db, tenantId, dateKey);
   const now = new Date().toISOString();
   const payload = {
     ...summary,
@@ -164,10 +164,11 @@ export function closeCash(db, dateKey, observacao, user) {
   const info = db
     .prepare(
       `INSERT INTO cash_closures
-        (data, total_centavos, total_pendente_centavos, qtd_sessoes, payload_json, usuario_id, criado_em)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        (tenant_id, data, total_centavos, total_pendente_centavos, qtd_sessoes, payload_json, usuario_id, criado_em)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
+      tenantId,
       dateKey,
       summary.totais.totalCentavos,
       summary.pendentes.totalCentavos,
@@ -188,14 +189,15 @@ export function closeCash(db, dateKey, observacao, user) {
   };
 }
 
-export function listClosures(db, limit = 60) {
+export function listClosures(db, tenantId, limit = 60) {
   return db
     .prepare(
       `SELECT cc.*, u.nome AS usuario_nome
        FROM cash_closures cc LEFT JOIN users u ON u.id = cc.usuario_id
+       WHERE cc.tenant_id = ?
        ORDER BY cc.data DESC, cc.id DESC LIMIT ?`,
     )
-    .all(limit)
+    .all(tenantId, limit)
     .map((row) => ({
       id: row.id,
       data: row.data,
@@ -208,28 +210,28 @@ export function listClosures(db, limit = 60) {
     }));
 }
 
-export function getReport(db, fromKey, toKey) {
+export function getReport(db, tenantId, fromKey, toKey) {
   const { start, end } = dayBoundsRange(fromKey, toKey);
 
-  const receipts = receiptsInRange(db, start, end);
+  const receipts = receiptsInRange(db, tenantId, start, end);
 
   const startedRows = db
     .prepare(
       `SELECT s.id, s.iniciado_em, s.encerrado_em, s.status, s.cart_id,
               c.codigo AS cart_codigo, s.cliente_nome, s.valor_centavos, s.pago
        FROM sessions s JOIN carts c ON c.id = s.cart_id
-       WHERE s.excluida_em IS NULL AND s.status != 'cancelada'
+       WHERE s.tenant_id = ? AND s.excluida_em IS NULL AND s.status != 'cancelada'
          AND s.iniciado_em >= ? AND s.iniciado_em < ?`,
     )
-    .all(start, end);
+    .all(tenantId, start, end);
 
   const cancelled = db
     .prepare(
       `SELECT COUNT(*) AS qtd FROM sessions
-       WHERE status = 'cancelada' AND excluida_em IS NULL
+       WHERE tenant_id = ? AND status = 'cancelada' AND excluida_em IS NULL
          AND iniciado_em >= ? AND iniciado_em < ?`,
     )
-    .get(start, end).qtd;
+    .get(tenantId, start, end).qtd;
 
   const revenue = receipts.reduce((sum, receipt) => sum + receipt.valorCentavos, 0);
   const paidSessionIds = new Set(receipts.map((receipt) => receipt.sessionId));
@@ -287,17 +289,18 @@ export function getReport(db, fromKey, toKey) {
       `SELECT s.id, s.cliente_nome, s.valor_centavos, s.valor_adiantado_centavos, s.pago,
               s.encerrado_em, s.status
        FROM sessions s
-       WHERE s.status = 'encerrada' AND s.pago = 0 AND s.excluida_em IS NULL
+       WHERE s.tenant_id = ? AND s.status = 'encerrada' AND s.pago = 0 AND s.excluida_em IS NULL
        ORDER BY s.encerrado_em ASC`,
     )
-    .all()
+    .all(tenantId)
     .map((row) => ({ ...row, restante: sessionAmounts(row).pendenteCentavos }))
     .filter((row) => row.restante > 0);
   const debtorMap = new Map();
   for (const row of pending) {
-    const key = row.cliente_nome.trim().toLowerCase();
+    const clienteLabel = String(row.cliente_nome || '').trim() || 'Sem identificação';
+    const key = clienteLabel.toLowerCase();
     const debtor = debtorMap.get(key) || {
-      clienteNome: row.cliente_nome.trim(),
+      clienteNome: clienteLabel,
       totalCentavos: 0,
       qtd: 0,
       ultimaEm: row.encerrado_em,

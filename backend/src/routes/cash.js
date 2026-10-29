@@ -18,7 +18,7 @@ export function createCashRouter(db) {
     try {
       const dateKey = req.query.data ? String(req.query.data) : localDateKey();
       if (!parseDateKey(dateKey)) throw badRequest('Data inválida.');
-      res.json(getCashSummary(db, dateKey));
+      res.json(getCashSummary(db, req.tenantId, dateKey));
     } catch (err) {
       next(err);
     }
@@ -30,18 +30,18 @@ export function createCashRouter(db) {
       const dateKey = body.data || localDateKey();
       if (!parseDateKey(dateKey)) throw badRequest('Data inválida.');
       if (dateKey > localDateKey()) throw badRequest('Não é possível fechar um caixa futuro.');
-      const existing = db.prepare('SELECT id FROM cash_closures WHERE data = ?').get(dateKey);
+      const existing = db.prepare('SELECT id FROM cash_closures WHERE tenant_id = ? AND data = ?').get(req.tenantId, dateKey);
       if (existing) throw conflict('O caixa desta data já foi fechado.', 'caixa_ja_fechado');
-      const closure = closeCash(db, dateKey, body.observacao, req.user);
-      req.app.locals.broadcast?.();
+      const closure = closeCash(db, req.tenantId, dateKey, body.observacao, req.user);
+      req.app.locals.broadcast?.(req.tenantId);
       res.status(201).json({ fechamento: closure });
     } catch (err) {
       next(err);
     }
   });
 
-  router.get('/closures', (_req, res) => {
-    res.json({ items: listClosures(db) });
+  router.get('/closures', (req, res) => {
+    res.json({ items: listClosures(db, req.tenantId) });
   });
 
   router.get('/closures/:id', (req, res, next) => {
@@ -50,9 +50,9 @@ export function createCashRouter(db) {
       const row = db
         .prepare(
           `SELECT cc.*, u.nome AS usuario_nome FROM cash_closures cc
-           LEFT JOIN users u ON u.id = cc.usuario_id WHERE cc.id = ?`,
+           LEFT JOIN users u ON u.id = cc.usuario_id WHERE cc.id = ? AND cc.tenant_id = ?`,
         )
-        .get(id);
+        .get(id, req.tenantId);
       if (!row) throw notFound('Fechamento não encontrado.');
       res.json({
         item: {

@@ -22,6 +22,10 @@ services:
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
       HTTPS_PORT: 3443
       TRUST_PROXY: "0"
+      SUPERADMIN_USERNAME: ${SUPERADMIN_USERNAME:-superadmin}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-superadmin123}
+      SUPERADMIN_NAME: ${SUPERADMIN_NAME:-Superadministrador}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
     volumes:
       - ./backend/data:/app/backend/data
       - ./backend/uploads:/app/backend/uploads

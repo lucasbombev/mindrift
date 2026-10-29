@@ -12,7 +12,7 @@ export function SocketProvider({ children }) {
   const refreshingRef = useRef(false);
 
   useEffect(() => {
-    if (!user || user.mustChangePassword) {
+    if (!user || user.mustChangePassword || user.role === 'superadmin') {
       setSocket(null);
       setConnected(false);
       return undefined;
@@ -60,7 +60,7 @@ export function SocketProvider({ children }) {
       setSocket(null);
       setConnected(false);
     };
-  }, [user?.id, user?.mustChangePassword]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.mustChangePassword, user?.role]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mantém a autenticação do socket atualizada quando a senha/token é renovada.
   const value = useMemo(() => ({ socket, connected }), [socket, connected]);

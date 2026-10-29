@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button, Avatar } from './ui.jsx';
 import { Icon } from './Icons.jsx';
-import { brl, formatCountdown, formatTime, paymentLabel, statusLabel } from '../lib/format.js';
+import { brl, clientName, formatCountdown, formatTime, paymentLabel, statusLabel } from '../lib/format.js';
 
 export function CartArt({ code }) {
   return (
@@ -84,7 +84,7 @@ export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd,
     .join(' ');
 
   return (
-    <article className={className}>
+    <article className={className} style={{ '--category-color': cart.category?.cor || '#f97316' }}>
       <div className="cart-card__media">
         {cart.fotoUrl ? (
           <img
@@ -100,6 +100,12 @@ export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd,
           <span className="cart-status__dot" />
           {statusLabel(cart.status)}
         </span>
+        {cart.category && (
+          <span className="cart-category" style={{ '--category-color': cart.category.cor }}>
+            <span aria-hidden="true">{cart.category.icone}</span>
+            {cart.category.nome}
+          </span>
+        )}
         {cart.fotoUrl && <span className="cart-card__code">{cart.codigo}</span>}
       </div>
 
@@ -107,9 +113,9 @@ export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd,
         {session ? (
           <>
             <div className="cart-card__session-head">
-              <Avatar name={session.clienteNome} size={34} />
+              <Avatar name={clientName(session.clienteNome)} size={34} />
               <div className="cart-card__session-name">
-                <strong>{session.clienteNome}</strong>
+                <strong>{clientName(session.clienteNome)}</strong>
                 <span>
                   {session.minutosContratados} min · {brl(session.valorCentavos)}
                 </span>

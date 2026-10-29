@@ -17,7 +17,7 @@ export function createReportsRouter(db) {
       if (new Date(end) - new Date(start) > 367 * 24 * 60 * 60 * 1000) {
         throw badRequest('O período máximo é de 366 dias.');
       }
-      res.json(getReport(db, fromKey, toKey));
+      res.json(getReport(db, req.tenantId, fromKey, toKey));
     } catch (err) {
       next(err);
     }

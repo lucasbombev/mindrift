@@ -7,12 +7,17 @@ import rateLimit from 'express-rate-limit';
 import { ZodError } from 'zod';
 import multer from 'multer';
 import { config } from './config.js';
-import { requireAuth } from './middleware/auth.js';
+import { requireAuth, requireSuperadmin, requireTenant } from './middleware/auth.js';
 import { HttpError } from './utils/errors.js';
 import { createAuthRouter } from './routes/auth.js';
+import { createPublicRouter } from './routes/public.js';
+import { createSuperadminRouter } from './routes/superadmin.js';
 import { createUsersRouter } from './routes/users.js';
 import { createCartsRouter } from './routes/carts.js';
 import { createPlansRouter } from './routes/plans.js';
+import { createCategoriesRouter } from './routes/categories.js';
+import { createScanRouter } from './routes/scan.js';
+import { createQrcodesRouter } from './routes/qrcodes.js';
 import { createSessionsRouter } from './routes/sessions.js';
 import { createDashboardRouter } from './routes/dashboard.js';
 import { createReportsRouter } from './routes/reports.js';
@@ -110,13 +115,21 @@ export function createApp({ db }) {
   });
 
   app.use('/api/auth', createAuthRouter(db));
+  app.use('/api/public', createPublicRouter(db));
 
   // A partir daqui, todas as rotas exigem JWT válido.
   app.use('/api', requireAuth(db));
+  // Superadmin só acessa o painel de negócios.
+  app.use('/api/superadmin', requireSuperadmin, createSuperadminRouter(db));
+  // Qualquer outra rota /api é operacional e exige um tenant ativo.
+  app.use('/api', requireTenant);
   app.use('/api/dashboard', createDashboardRouter(db));
   app.use('/api/users', createUsersRouter(db));
   app.use('/api/carts', createCartsRouter(db));
   app.use('/api/plans', createPlansRouter(db));
+  app.use('/api/categories', createCategoriesRouter(db));
+  app.use('/api/scan', createScanRouter(db));
+  app.use('/api/qrcodes', createQrcodesRouter(db));
   app.use('/api/sessions', createSessionsRouter(db));
   app.use('/api/reports', createReportsRouter(db));
   app.use('/api/cash', createCashRouter(db));

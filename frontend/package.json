@@ -9,6 +9,8 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
+    "html5-qrcode": "^2.3.8",
+    "qrcode": "^1.5.4",
     "react": "^19.2.9",
     "react-dom": "^19.2.9",
     "react-router-dom": "^7.18.5",
