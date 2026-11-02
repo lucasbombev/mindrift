@@ -1,4 +1,3 @@
-import { Button, IconButton } from './ui.jsx';
 import { Icon } from './Icons.jsx';
 import { clientName, formatCountdown, formatDuration } from '../lib/format.js';
 
@@ -30,67 +29,32 @@ export function LeadAlertBanner({ alerts, now, onAcknowledge }) {
   );
 }
 
-export function ExpiredAlertsOverlay({ alerts, now, onAcknowledge, onAcknowledgeAll, onEnd, onEnableSound }) {
+export function ExpiredAlertBanner({ alerts, now, onAcknowledge, onAcknowledgeAll, onEnd }) {
   if (!alerts.length) return null;
   return (
-    <div className="alarm-overlay" role="alertdialog" aria-modal="true" aria-label="Tempo esgotado">
-      <div className="alarm-card">
-        <div className="alarm-card__beacon">
-          <Icon name="alert" size={38} />
-        </div>
-        <span className="alarm-card__eyebrow">Tempo esgotado</span>
-        <h1>{alerts.length > 1 ? `${alerts.length} sessões estouraram` : 'Hora de encerrar!'}</h1>
-        <p className="alarm-card__intro">
-          O cliente já passou do tempo contratado. Encerre ou adicione mais tempo para liberar o
-          carrinho.
-        </p>
-
-        <div className="alarm-list">
-          {alerts.map((alert) => {
-            const over = now - new Date(alert.session.fimPrevistoEm).getTime();
-            return (
-              <div key={alert.key} className="alarm-item">
-                <div className="alarm-item__info">
-                  <span className="alarm-item__cart">{alert.session.cartCodigo}</span>
-                  <div>
-                    <strong>{clientName(alert.session.clienteNome)}</strong>
-                    <span className="alarm-item__time">
-                      +{formatDuration(over / 1000)} de excedente
-                    </span>
-                  </div>
-                </div>
-                <div className="alarm-item__actions">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      onAcknowledge(alert);
-                      onEnd(alert.session);
-                    }}
-                  >
-                    Encerrar
-                  </Button>
-                  <IconButton
-                    icon="close"
-                    label="Silenciar este alerta"
-                    onClick={() => onAcknowledge(alert)}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="alarm-card__footer">
-          <Button variant="danger" size="lg" onClick={onAcknowledgeAll} block>
-            Estou ciente · silenciar
-          </Button>
-          {onEnableSound && (
-            <button type="button" className="alarm-card__sound" onClick={onEnableSound}>
-              <Icon name="sound" size={17} /> Ativar som e notificações
-            </button>
-          )}
-        </div>
+    <div className="expired-banner" role="alert">
+      <div className="expired-banner__head">
+        <span className="expired-banner__icon"><Icon name="alert" size={20} /></span>
+        <strong>Tempo esgotado</strong>
+        <button type="button" className="expired-banner__silence" onClick={onAcknowledgeAll}>
+          Silenciar todos
+        </button>
+      </div>
+      <div className="expired-banner__items">
+        {alerts.map((alert) => {
+          const over = Math.max(0, now - new Date(alert.session.fimPrevistoEm).getTime());
+          return (
+            <div key={alert.key} className="expired-banner__item">
+              <span><strong>{alert.session.cartCodigo}</strong> · +{formatDuration(over / 1000)}</span>
+              <button type="button" onClick={() => { onAcknowledge(alert); onEnd(alert.session); }}>
+                Encerrar
+              </button>
+              <button type="button" aria-label="Silenciar este alerta" onClick={() => onAcknowledge(alert)}>
+                <Icon name="close" size={15} />
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

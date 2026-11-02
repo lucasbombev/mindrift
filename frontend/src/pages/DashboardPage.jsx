@@ -9,7 +9,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { useNow } from '../hooks/useServerClock.js';
 import { useTimerAlerts } from '../hooks/useTimerAlerts.js';
 import { CartCard } from '../components/CartCard.jsx';
-import { ExpiredAlertsOverlay, LeadAlertBanner } from '../components/Alerts.jsx';
+import { ExpiredAlertBanner, LeadAlertBanner } from '../components/Alerts.jsx';
 import { EndSessionModal, RenewSessionModal, StartSessionModal } from '../components/sessionModals.jsx';
 import { CartStatusModal } from '../components/CartStatusModal.jsx';
 import {
@@ -235,6 +235,14 @@ export function DashboardPage() {
         </button>
       )}
 
+      <ExpiredAlertBanner
+        alerts={endAlerts}
+        now={serverNow}
+        onAcknowledge={acknowledge}
+        onAcknowledgeAll={acknowledgeAll}
+        onEnd={(session) => setModal({ type: 'end', session })}
+      />
+
       <LeadAlertBanner
         alerts={leadAlerts}
         now={serverNow}
@@ -418,14 +426,6 @@ export function DashboardPage() {
         />
       )}
 
-      <ExpiredAlertsOverlay
-        alerts={endAlerts}
-        now={serverNow}
-        onAcknowledge={acknowledge}
-        onAcknowledgeAll={acknowledgeAll}
-        onEnd={(session) => setModal({ type: 'end', session })}
-        onEnableSound={soundEnabled ? null : handleSound}
-      />
     </div>
   );
 }

@@ -69,8 +69,8 @@ const valueSchema = z.object({
   motivo: z.string().trim().max(200).optional(),
 });
 
-function broadcast(req) {
-  req.app.locals.broadcast?.(req.tenantId);
+function broadcast(req, eventName = 'session_updated') {
+  req.app.locals.broadcast?.(req.tenantId, eventName);
 }
 
 export function createSessionsRouter(db) {
@@ -164,7 +164,7 @@ export function createSessionsRouter(db) {
         throw badRequest('Escolha um plano ou informe minutos e valor avulso.');
       }
       const session = startSession(db, req.tenantId, body, req.user);
-      broadcast(req);
+      broadcast(req, 'session_started');
       res.status(201).json({ sessao: session, serverNow: new Date().toISOString() });
     } catch (err) {
       next(err);
@@ -189,7 +189,7 @@ export function createSessionsRouter(db) {
     try {
       const body = endSchema.parse(req.body ?? {});
       const session = endSession(db, req.tenantId, Number(req.params.id), body, req.user);
-      broadcast(req);
+      broadcast(req, 'session_ended');
       res.json({ sessao: session, serverNow: new Date().toISOString() });
     } catch (err) {
       next(err);

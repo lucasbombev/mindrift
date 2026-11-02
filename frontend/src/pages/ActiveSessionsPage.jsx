@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useSocketEvent } from '../context/SocketContext.jsx';
 import { useNow } from '../hooks/useServerClock.js';
-import { brl, clientName, formatCountdown, formatElapsed, formatTime, statusLabel } from '../lib/format.js';
+import { brl, clientName, formatCountdown, formatElapsed, formatTime } from '../lib/format.js';
 import { Button, EmptyState, PageHeader, Spinner } from '../components/ui.jsx';
 import { Icon } from '../components/Icons.jsx';
 import { CartArt } from '../components/CartCard.jsx';
@@ -18,8 +19,8 @@ export function ActiveSessionsPage() {
   const [endSession, setEndSession] = useState(null);
   const now = useNow(500) + serverOffset;
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = await api.get('/sessions/active');
       setSessions(data.items || []);
@@ -28,11 +29,24 @@ export function ActiveSessionsPage() {
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
+  const applySocketSessions = useCallback((payload) => {
+    if (!Array.isArray(payload?.sessoesAtivas)) return;
+    setSessions(payload.sessoesAtivas);
+    if (payload.serverNow) setServerOffset(new Date(payload.serverNow).getTime() - Date.now());
+    setError('');
+    setLoading(false);
+  }, []);
+
   useEffect(() => { load(); }, [load]);
+
+  useSocketEvent('session_started', applySocketSessions);
+  useSocketEvent('session_ended', applySocketSessions);
+  useSocketEvent('session_updated', applySocketSessions);
+  useSocketEvent('connect', () => load(true));
 
   return (
     <div className="container active-sessions-page">
@@ -40,13 +54,12 @@ export function ActiveSessionsPage() {
         title="Em uso"
         subtitle="Veículos com sessão ativa agora. Use Encerrar para fazer o check-in."
         eyebrow="Operação"
-        actions={<Button variant="secondary" icon="refresh" onClick={load} loading={loading}>Atualizar</Button>}
       />
 
       {loading ? (
         <div className="center-pad"><Spinner size={28} /></div>
       ) : error ? (
-        <div className="error-panel error-panel--inline"><p>{error}</p><Button size="sm" onClick={load}>Tentar novamente</Button></div>
+        <div className="error-panel error-panel--inline"><p>{error}</p><Button size="sm" onClick={() => load()}>Tentar novamente</Button></div>
       ) : sessions.length === 0 ? (
         <EmptyState
           icon="timer"
@@ -107,7 +120,7 @@ export function ActiveSessionsPage() {
           session={endSession}
           offset={serverOffset}
           onClose={() => setEndSession(null)}
-          onSuccess={() => { setEndSession(null); load(); }}
+          onSuccess={() => { setEndSession(null); load(true); }}
         />
       )}
     </div>

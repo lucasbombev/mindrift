@@ -49,16 +49,29 @@ io.attach(httpServer);
 if (httpsServer) io.attach(httpsServer);
 
 app.locals.io = io;
-app.locals.broadcast = (tenantId) => {
+app.locals.broadcast = (tenantId, eventName = 'session_updated') => {
   if (!tenantId) return;
-  io.to(`tenant:${tenantId}`).emit('dashboard', getDashboard(db, tenantId));
+  const dashboard = getDashboard(db, tenantId);
+  const payload = {
+    tenantId,
+    serverNow: dashboard.serverNow,
+    sessoesAtivas: dashboard.sessoesAtivas,
+  };
+  io.to(`tenant:${tenantId}`).emit('dashboard', dashboard);
+  io.to(`tenant:${tenantId}`).emit(eventName, payload);
 };
 app.locals.disconnectTenant = (tenantId) => {
   io.in(`tenant:${tenantId}`).disconnectSockets(true);
 };
 app.locals.broadcastAll = () => {
   for (const tenant of db.prepare('SELECT id FROM tenants WHERE ativo = 1 AND excluido_em IS NULL').all()) {
-    io.to(`tenant:${tenant.id}`).emit('dashboard', getDashboard(db, tenant.id));
+    const dashboard = getDashboard(db, tenant.id);
+    io.to(`tenant:${tenant.id}`).emit('dashboard', dashboard);
+    io.to(`tenant:${tenant.id}`).emit('session_updated', {
+      tenantId: tenant.id,
+      serverNow: dashboard.serverNow,
+      sessoesAtivas: dashboard.sessoesAtivas,
+    });
   }
 };
 
