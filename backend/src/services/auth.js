@@ -26,6 +26,7 @@ export function publicUser(row) {
     username: row.username,
     email: row.email || null,
     telefone: row.telefone || null,
+    pushEnabled: row.push_enabled === undefined ? true : Boolean(row.push_enabled),
     role: row.role,
     ativo: Boolean(row.ativo),
     mustChangePassword: Boolean(row.must_change_password),

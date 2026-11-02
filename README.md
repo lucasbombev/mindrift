@@ -336,6 +336,16 @@ apenas o indicador verde/vermelho **Sistema operacional**.
 - Backend usa `web-push` + chaves **VAPID** (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
   `VAPID_SUBJECT`). Gere com `npx web-push generate-vapid-keys --json` e coloque no
   `backend/.env` (as chaves já foram geradas neste ambiente).
+- `users.push_enabled` nasce **1 (ativado)**. Após o login, se a permissão do navegador
+  estiver em `default`, o app mostra o **soft prompt** “Fique atento aos tempos!…” com
+  **Agora não** e **Ativar Notificações**. O “Agora não” grava `push_enabled=0` e dispensa
+  o prompt naquele dispositivo.
+- Se a permissão já estiver `granted`, o app tenta inscrever o dispositivo automaticamente;
+  se estiver `denied`, mostra instruções no lugar do prompt.
+- `GET /api/push/status?endpoint=...` informa se **aquele dispositivo** tem inscrição ativa;
+  `PATCH /api/push/preferences` grava a preferência. O toggle de Ajustes usa esse status real.
+- No iOS Safari sem PWA instalado, o soft prompt avisa: “Para receber notificações no iPhone,
+  adicione o app à tela de início primeiro.”
 - Tabela `push_subscriptions`: uma inscrição por dispositivo, vinculada a usuário e tenant.
 - Rotas: `GET /api/push/public-key`, `GET /api/push/status`, `POST /api/push/subscribe`,
   `DELETE /api/push/unsubscribe`, `POST /api/push/test`.
@@ -389,7 +399,7 @@ A migração é automática, transacional e idempotente. Ela detecta banco legad
 (`default`). O admin atual continua no tenant default; o superadmin é criado pelo seed.
 
 Detalhes e rollback: **[backend/migrations/MIGRACAO.md](backend/migrations/MIGRACAO.md)**.
-Schema de referência: **[001_multi_tenant.sql](backend/migrations/001_multi_tenant.sql)** (v3), **[002_superadmin_system_sounds.sql](backend/migrations/002_superadmin_system_sounds.sql)** (v4), **[003_timer_livre_push.sql](backend/migrations/003_timer_livre_push.sql)** (v5) e **[004_superadmin_password_audit.sql](backend/migrations/004_superadmin_password_audit.sql)** (v6).
+Schema de referência: **[001_multi_tenant.sql](backend/migrations/001_multi_tenant.sql)** (v3), **[002_superadmin_system_sounds.sql](backend/migrations/002_superadmin_system_sounds.sql)** (v4), **[003_timer_livre_push.sql](backend/migrations/003_timer_livre_push.sql)** (v5) e **[004_superadmin_password_audit.sql](backend/migrations/004_superadmin_password_audit.sql)** (v6), **[005_push_enabled.sql](backend/migrations/005_push_enabled.sql)** (v7).
 
 ### Restauração manual
 
@@ -484,7 +494,10 @@ Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no cel
       só encerra no botão; digitar o valor no encerramento atualiza o caixa.
 
 **Web Push**
-- [ ] Em Ajustes → Alertas (ou Mais → Som e vibração), ativar push e permitir notificações.
+- [ ] Ao entrar pela primeira vez com permissão `default`, o soft prompt aparece automaticamente.
+- [ ] Tocar em **Ativar Notificações**, conceder e confirmar a inscrição no banco e o toast.
+- [ ] Tocar em **Agora não** e confirmar que o prompt não reaparece naquele dispositivo.
+- [ ] Em Ajustes → Alertas (ou Mais → Som e vibração), o toggle reflete o status real do dispositivo; se a permissão estiver bloqueada, aparecem as instruções de Chrome/Safari.
 - [ ] Tocar em **Enviar notificação de teste** com o app em segundo plano e ver a notificação.
 - [ ] Fechar o PWA, deixar um timer curto zerar e confirmar a notificação nativa.
 - [ ] Tocar na notificação e confirmar que abre o app em `/dashboard`.

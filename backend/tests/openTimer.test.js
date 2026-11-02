@@ -68,22 +68,38 @@ test('timer livre rejeita pagamento adiantado', async () => {
   assert.equal(res.status, 400);
 });
 
-test('push subscription é salva/removida e public key existe', async () => {
+test('push nasce habilitado, status é por dispositivo e preferência persiste', async () => {
   const key = await api.get('/api/push/public-key').set(auth(token));
   assert.equal(key.status, 200);
   assert.ok(key.body.publicKey);
-  const sub = {
-    endpoint: 'https://example.com/push/test-endpoint',
-    keys: { p256dh: 'abc', auth: 'def' },
-  };
+  const me = await api.get('/api/auth/me').set(auth(token));
+  assert.equal(me.body.user.pushEnabled, true);
+
+  const endpoint = 'https://example.com/push/test-endpoint';
+  const sub = { endpoint, keys: { p256dh: 'abc', auth: 'def' } };
+  const before = await api.get(`/api/push/status?endpoint=${encodeURIComponent(endpoint)}`).set(auth(token));
+  assert.equal(before.status, 200);
+  assert.equal(before.body.ativo, false);
+
   const saved = await api.post('/api/push/subscribe').set(auth(token)).send({ subscription: sub });
   assert.equal(saved.status, 201, JSON.stringify(saved.body));
-  const rows = ctx.db.prepare('SELECT * FROM push_subscriptions').all();
-  assert.ok(rows.some((row) => row.endpoint === sub.endpoint));
+  const savedStatus = await api.get(`/api/push/status?endpoint=${encodeURIComponent(endpoint)}`).set(auth(token));
+  assert.equal(savedStatus.body.ativo, true);
+  assert.equal(savedStatus.body.pushEnabled, true);
+
+  const otherStatus = await api.get('/api/push/status?endpoint=https://example.com/outro').set(auth(token));
+  assert.equal(otherStatus.body.ativo, false);
+
+  const pref = await api.patch('/api/push/preferences').set(auth(token)).send({ enabled: false });
+  assert.equal(pref.status, 200);
+  assert.equal(pref.body.pushEnabled, false);
+  const meOff = await api.get('/api/auth/me').set(auth(token));
+  assert.equal(meOff.body.user.pushEnabled, false);
+
   const removed = await api
     .delete('/api/push/unsubscribe')
     .set(auth(token))
-    .send({ endpoint: sub.endpoint });
+    .send({ endpoint });
   assert.equal(removed.status, 200);
   assert.equal(ctx.db.prepare('SELECT COUNT(*) AS n FROM push_subscriptions').get().n, 0);
 });

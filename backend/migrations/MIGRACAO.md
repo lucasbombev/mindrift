@@ -141,3 +141,12 @@ Rota: `PUT /api/superadmin/password` com `{ senha_atual, nova_senha }`
 (mínimo 6 caracteres; senha atual validada com bcrypt).
 
 Schema de referência: [`004_superadmin_password_audit.sql`](./004_superadmin_password_audit.sql).
+
+## Migração 005 (v7) — push ativado por padrão
+
+Adiciona `users.push_enabled INTEGER NOT NULL DEFAULT 1`. Não altera
+`push_subscriptions`. A inscrição por dispositivo continua sendo a fonte de
+verdade do toggle; `push_enabled` registra a preferência do usuário
+(`Agora não` = 0, inscrição = 1).
+
+Schema de referência: [`005_push_enabled.sql`](./005_push_enabled.sql).

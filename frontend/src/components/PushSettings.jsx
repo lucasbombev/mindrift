@@ -1,25 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useToast } from '../context/ToastContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+import {
+  getCurrentSubscription,
+  pushSupported,
+  subscribeCurrentDevice,
+  unsubscribeCurrentDevice,
+  syncSubscription,
+} from '../lib/push.js';
 import { Button, InfoNote, Spinner, Toggle } from './ui.jsx';
 import { Icon } from './Icons.jsx';
 
-function withTimeout(promise, ms, fallback = null) {
-  return Promise.race([
-    promise,
-    new Promise((resolve) => setTimeout(() => resolve(fallback), ms)),
-  ]);
-}
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = atob(base64);
-  return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
-}
-
 export function PushSettings({ compact = false }) {
   const { toast } = useToast();
+  const { refreshUser } = useAuth();
   const [supported, setSupported] = useState(true);
   const [permission, setPermission] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
   const [subscribed, setSubscribed] = useState(false);
@@ -28,11 +23,7 @@ export function PushSettings({ compact = false }) {
   const [message, setMessage] = useState('');
 
   const check = useCallback(async () => {
-    const canUse =
-      'serviceWorker' in navigator &&
-      'PushManager' in window &&
-      'Notification' in window &&
-      window.isSecureContext;
+    const canUse = pushSupported();
     setSupported(canUse);
     if (!canUse) {
       setLoading(false);
@@ -40,11 +31,13 @@ export function PushSettings({ compact = false }) {
     }
     setPermission(Notification.permission);
     try {
-      const reg = await withTimeout(navigator.serviceWorker.getRegistration(), 3000, null);
-      const sub = reg ? await withTimeout(reg.pushManager.getSubscription(), 3000, null) : null;
-      setSubscribed(Boolean(sub));
-      if (sub) {
-        await api.post('/push/subscribe', { subscription: sub.toJSON() }).catch(() => {});
+      const sub = await getCurrentSubscription();
+      if (!sub) {
+        setSubscribed(false);
+      } else {
+        await syncSubscription(sub).catch(() => {});
+        const status = await api.get(`/push/status?endpoint=${encodeURIComponent(sub.endpoint)}`);
+        setSubscribed(Boolean(status.ativo));
       }
     } catch {
       setSubscribed(false);
@@ -65,19 +58,9 @@ export function PushSettings({ compact = false }) {
       if (permissionResult !== 'granted') {
         throw new Error('Permissão de notificação negada. Ative nas configurações do navegador.');
       }
-      const reg = await withTimeout(navigator.serviceWorker.getRegistration(), 3000, null);
-      if (!reg) {
-        throw new Error('O service worker ainda não está registrado. Abra o app instalado e tente novamente.');
-      }
-      const key = await api.get('/push/public-key');
-      const subscription =
-        (await reg.pushManager.getSubscription()) ||
-        (await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(key.publicKey),
-        }));
-      await api.post('/push/subscribe', { subscription: subscription.toJSON() });
+      await subscribeCurrentDevice();
       setSubscribed(true);
+      await refreshUser();
       toast('Notificações push ativadas neste dispositivo.', { type: 'success' });
     } catch (err) {
       setMessage(err.message);
@@ -90,13 +73,9 @@ export function PushSettings({ compact = false }) {
     setBusy(true);
     setMessage('');
     try {
-      const reg = await withTimeout(navigator.serviceWorker.getRegistration(), 3000, null);
-      const sub = reg ? await withTimeout(reg.pushManager.getSubscription(), 3000, null) : null;
-      if (sub) {
-        await api.delete('/push/unsubscribe', { endpoint: sub.endpoint }).catch(() => {});
-        await sub.unsubscribe();
-      }
+      await unsubscribeCurrentDevice();
       setSubscribed(false);
+      await refreshUser();
       toast('Notificações push desativadas.', { type: 'success' });
     } catch (err) {
       setMessage(err.message);
@@ -154,7 +133,7 @@ export function PushSettings({ compact = false }) {
           )}
           {permission === 'denied' && (
             <InfoNote tone="warning" icon="alert">
-              A permissão está bloqueada. Libere notificações nas configurações do navegador/PWA.
+              A permissão está bloqueada. No Chrome, toque no cadeado ao lado da URL → Notificações → Permitir. No Safari/iPhone, use Ajustes do iPhone → Notificações → Mindrift (com o PWA instalado na Tela de Início).
             </InfoNote>
           )}
           <p className="muted small">

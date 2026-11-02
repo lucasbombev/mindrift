@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS users (
   username TEXT NOT NULL COLLATE NOCASE,
   email TEXT,
   telefone TEXT,
+  push_enabled INTEGER NOT NULL DEFAULT 1,
   senha_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('superadmin', 'admin', 'operador')),
   ativo INTEGER NOT NULL DEFAULT 1,
@@ -576,6 +577,20 @@ function migrateV6(db, { makeBackup = true } = {}) {
   db.pragma('user_version = 6');
 }
 
+
+/** v7 — preferência global de push por usuário (default ativado). */
+function migrateV7(db, { makeBackup = true } = {}) {
+  const cols = tableColumns(db, 'users');
+  if (!cols.has('push_enabled')) {
+    if (makeBackup && tableExists(db, 'users')) createMigrationBackup(db);
+    db.exec('ALTER TABLE users ADD COLUMN push_enabled INTEGER NOT NULL DEFAULT 1');
+  }
+  db.exec(SCHEMA_TABLES);
+  db.exec(SCHEMA_INDEXES);
+  db.prepare('INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (7, ?)').run(nowIso());
+  db.pragma('user_version = 7');
+}
+
 export function ensureDefaultTenant(db) {
   let tenant = db.prepare("SELECT * FROM tenants WHERE slug = 'default'").get();
   if (!tenant) {
@@ -608,6 +623,7 @@ export function openDb(filePath = config.dbPath) {
     migrateV4(db, { makeBackup: usersExist });
     migrateV5(db, { makeBackup: usersExist });
     migrateV6(db, { makeBackup: usersExist });
+    migrateV7(db, { makeBackup: usersExist });
     ensureDefaultTenant(db);
   } else {
     migrateLegacy(db);
@@ -615,6 +631,7 @@ export function openDb(filePath = config.dbPath) {
     migrateV4(db, { makeBackup: false });
     migrateV5(db, { makeBackup: false });
     migrateV6(db, { makeBackup: false });
+    migrateV7(db, { makeBackup: false });
   }
 
   return db;

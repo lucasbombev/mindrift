@@ -18,6 +18,7 @@ import { SettingsPage } from './pages/SettingsPage.jsx';
 import { ChangePasswordPage } from './pages/ChangePasswordPage.jsx';
 import { PwaUpdateBanner } from './components/PwaUpdateBanner.jsx';
 import { FooterCredit } from './components/FooterCredit.jsx';
+import { PushPrompt } from './components/PushPrompt.jsx';
 import { SuperadminPage } from './pages/SuperadminPage.jsx';
 import { CategoriesPage } from './pages/CategoriesPage.jsx';
 import { QrCodesPage } from './pages/QrCodesPage.jsx';
@@ -181,6 +182,7 @@ export default function App() {
   return (
     <>
       <AppRoutes />
+      <PushPrompt />
       <PwaUpdateBanner />
       <FooterCredit />
     </>

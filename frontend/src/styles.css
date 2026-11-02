@@ -6671,3 +6671,32 @@ body:has(.bottom-nav) .credit-footer {
   color: var(--muted);
   font-size: 11px;
 }
+
+/* Soft prompt de push */
+.push-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  text-align: center;
+}
+.push-prompt__icon {
+  width: 68px;
+  height: 68px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+.push-prompt p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.push-prompt__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
