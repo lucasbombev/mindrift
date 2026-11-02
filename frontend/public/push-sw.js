@@ -7,13 +7,17 @@ self.addEventListener('push', (event) => {
     data = {};
   }
   const title = data.title || 'Mindrift';
+  const sound = data.som || '/sounds/alarme.wav';
   const options = {
     body: data.body || 'Há uma atualização no seu aluguel.',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     tag: data.tag || 'mindrift-timer',
     renotify: true,
-    data: { url: data.url || '/dashboard' },
+    silent: false,
+    sound,
+    vibrate: [400, 150, 400],
+    data: { url: data.url || '/dashboard', som: sound },
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });

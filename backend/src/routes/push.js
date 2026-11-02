@@ -106,6 +106,7 @@ export function createPushRouter(db) {
         title: 'Notificação de teste',
         body: 'Se você está vendo isto, o Web Push do Mindrift está funcionando.',
         url: '/dashboard',
+        som: '/sounds/alarme.wav',
       });
       if (result.sent === 0) {
         throw badRequest('Nenhuma inscrição ativa. Ative as notificações push primeiro.', 'sem_inscricao');

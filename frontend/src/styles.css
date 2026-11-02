@@ -6463,31 +6463,6 @@ body:has(.bottom-nav) .pwa-update-banner {
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* Crédito global */
-.credit-footer {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 6px;
-  z-index: 55;
-  text-align: center;
-  color: #94a3b8;
-  font-size: 9.5px;
-  letter-spacing: 0.01em;
-  pointer-events: none;
-}
-.credit-footer a {
-  color: #94a3b8;
-  text-decoration: underline;
-  pointer-events: auto;
-}
-body:has(.bottom-nav) .credit-footer {
-  bottom: calc(var(--bottom-nav-height) + var(--safe-bottom) + 2px);
-}
-@media (min-width: 901px) {
-  .credit-footer { bottom: 8px; }
-}
-
 /* Em uso */
 .active-session-list {
   display: flex;

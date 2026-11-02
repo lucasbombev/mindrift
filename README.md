@@ -18,7 +18,7 @@ sessões, caixa e configurações. Um administrador **nunca** acessa dados de ou
 - **Telefone** do usuário com máscara brasileira e E.164.
 - **Som configurável** por tenant e por usuário (6 sons locais, volume, vibração e repetição).
 - **Operador pode alterar status** do carrinho com motivo e histórico (`CartStatusEvent`).
-- **Nome Mindrift** em toda a interface, PWA e manifest; rodapé com crédito ao GitHub.
+- **Nome Mindrift** em toda a interface, PWA e manifest.
 - **Menu reorganizado**: Início, Escanear, Em uso, Histórico e Mais; Relatórios/Caixa em **Mais → Administração**.
 - **Timer livre** (0 minutos) progressivo, sem fim previsto, encerrado manualmente com valor informado.
 - **Web Push** opcional para avisar o tempo esgotado com o app fechado.
@@ -28,7 +28,6 @@ sessões, caixa e configurações. Um administrador **nunca** acessa dados de ou
 ## 0. Identidade e navegação
 
 - Nome do app: **Mindrift** (título da aba, logo, login, manifest, health e documentação).
-- Rodapé global: **desenvolvido por [github.com/lucasbombev](https://github.com/lucasbombev)**.
 - Menu superior: **Início · Escanear · Em uso · Histórico · Mais**.
 - **Mais → Administração** (admin): Relatórios, Caixa, Carrinhos, Categorias, Planos, QR Codes,
   Usuários e Ajustes.
@@ -516,7 +515,7 @@ Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no cel
 - [ ] Voltar para disponível/carregando e conferir cada transição.
 
 **Identidade, menu e timer livre**
-- [ ] Título/logo/manifest mostram **Mindrift**; o rodapé tem o link para github.com/lucasbombev.
+- [ ] Título/logo/manifest mostram **Mindrift**.
 - [ ] Menu superior mostra **Início, Escanear, Em uso, Histórico, Mais**; Relatórios/Caixa estão em Mais → Administração.
 - [ ] A tela **Em uso** lista todos os aluguéis ativos com foto e timer; **Encerrar aluguel** funciona.
 - [ ] Iniciar com **0 minutos** mostra **Timer livre**, conta para cima, continua sem fim previsto e

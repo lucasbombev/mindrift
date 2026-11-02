@@ -155,10 +155,15 @@ const expireCheck = setInterval(() => {
         fimPrevistoEm: session.fim_previsto_em,
         serverNow: now,
       });
+      const somFim = getSetting(db, session.tenant_id, 'som_fim', 'alarme');
+      const somValido = ['beep', 'sino', 'alarme', 'bipe-duplo', 'apito', 'campainha'].includes(somFim)
+        ? somFim
+        : 'alarme';
       void sendToTenant(db, session.tenant_id, {
         title: 'Tempo esgotado!',
         body: `O aluguel do veículo ${session.cart_codigo} terminou.`,
         url: '/dashboard',
+        som: `/sounds/${somValido}.wav`,
       });
     } else if (remaining > 0 && remaining <= leadSeconds * 1000 && !notified.has(leadKey)) {
       notified.add(leadKey);
