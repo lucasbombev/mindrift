@@ -167,9 +167,11 @@ CREATE TABLE IF NOT EXISTS cart_status_events (
 
 CREATE TABLE IF NOT EXISTS audit_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+  tenant_id INTEGER REFERENCES tenants(id),
   superadmin_id INTEGER NOT NULL REFERENCES users(id),
   admin_id INTEGER REFERENCES users(id),
+  tipo TEXT NOT NULL DEFAULT 'impersonation'
+    CHECK (tipo IN ('impersonation', 'password_change')),
   motivo TEXT NOT NULL,
   iniciado_em TEXT NOT NULL,
   finalizado_em TEXT,
@@ -524,6 +526,56 @@ function migrateV5(db, { makeBackup = true } = {}) {
   db.pragma('user_version = 5');
 }
 
+
+/** v6 — AuditLog de alteração de senha do superadmin (tenant opcional + tipo). */
+function migrateV6(db, { makeBackup = true } = {}) {
+  const cols = tableColumns(db, 'audit_logs');
+  const tenantCol = db.prepare('PRAGMA table_info(audit_logs)').all().find((c) => c.name === 'tenant_id');
+  const needsRebuild = Boolean(tenantCol?.notnull) || !cols.has('tipo');
+  if (needsRebuild && makeBackup && tableExists(db, 'audit_logs')) createMigrationBackup(db);
+  if (needsRebuild) {
+    db.pragma('foreign_keys = OFF');
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.exec(`
+        CREATE TABLE audit_logs_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tenant_id INTEGER REFERENCES tenants(id),
+          superadmin_id INTEGER NOT NULL REFERENCES users(id),
+          admin_id INTEGER REFERENCES users(id),
+          tipo TEXT NOT NULL DEFAULT 'impersonation'
+            CHECK (tipo IN ('impersonation', 'password_change')),
+          motivo TEXT NOT NULL,
+          iniciado_em TEXT NOT NULL,
+          finalizado_em TEXT,
+          ip TEXT,
+          user_agent TEXT
+        )
+      `);
+      db.exec(`
+        INSERT INTO audit_logs_new
+          (id, tenant_id, superadmin_id, admin_id, tipo, motivo, iniciado_em, finalizado_em, ip, user_agent)
+        SELECT id, tenant_id, superadmin_id, admin_id, 'impersonation', motivo, iniciado_em,
+               finalizado_em, ip, user_agent
+        FROM audit_logs
+      `);
+      db.exec('DROP TABLE audit_logs');
+      db.exec('ALTER TABLE audit_logs_new RENAME TO audit_logs');
+      db.exec('COMMIT');
+    } catch (err) {
+      try { db.exec('ROLLBACK'); } catch { /* noop */ }
+      db.pragma('foreign_keys = ON');
+      throw err;
+    }
+    db.pragma('foreign_keys = ON');
+  }
+  db.exec(SCHEMA_TABLES);
+  db.exec(SCHEMA_INDEXES);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_audit_logs_tipo ON audit_logs(tipo, iniciado_em)');
+  db.prepare('INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (6, ?)').run(nowIso());
+  db.pragma('user_version = 6');
+}
+
 export function ensureDefaultTenant(db) {
   let tenant = db.prepare("SELECT * FROM tenants WHERE slug = 'default'").get();
   if (!tenant) {
@@ -555,12 +607,14 @@ export function openDb(filePath = config.dbPath) {
     db.exec(SCHEMA_TABLES);
     migrateV4(db, { makeBackup: usersExist });
     migrateV5(db, { makeBackup: usersExist });
+    migrateV6(db, { makeBackup: usersExist });
     ensureDefaultTenant(db);
   } else {
     migrateLegacy(db);
     ensureDefaultTenant(db);
     migrateV4(db, { makeBackup: false });
     migrateV5(db, { makeBackup: false });
+    migrateV6(db, { makeBackup: false });
   }
 
   return db;

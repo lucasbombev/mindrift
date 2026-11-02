@@ -129,3 +129,15 @@ Schema de referência: [`003_timer_livre_push.sql`](./003_timer_livre_push.sql).
 
 Pare o servidor e restaure o backup `pre-migration-*.db` mais recente criado
 antes da v5. Para voltar também o comportamento do app, use a versão anterior.
+
+## Migração 004 (v6) — auditoria de alteração de senha
+
+A versão 6 reconstrói `audit_logs` para permitir `tenant_id NULL` e adiciona
+`tipo` (`impersonation` ou `password_change`). Os registros antigos são copiados
+como `impersonation`. A alteração de senha do superadmin é registrada com
+`tipo='password_change'`, `tenant_id=NULL`, `superadmin_id`, IP, user-agent e início/fim.
+
+Rota: `PUT /api/superadmin/password` com `{ senha_atual, nova_senha }`
+(mínimo 6 caracteres; senha atual validada com bcrypt).
+
+Schema de referência: [`004_superadmin_password_audit.sql`](./004_superadmin_password_audit.sql).

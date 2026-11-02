@@ -171,6 +171,10 @@ O superadmin não é um admin de negócio. Ele acessa **Negócios** e **Sistema*
 - entra no tenant em **impersonação auditada** com motivo; o acesso fica em `audit_logs` com início/fim;
 - publica **comunicado global** exibido no dashboard de todos os tenants.
 
+**Conta**
+- o ícone de chave no topo do superadmin abre **Alterar senha**;
+- rota `PUT /api/superadmin/password` valida a senha atual com bcrypt (mínimo 6) e registra em `audit_logs`.
+
 **Sistema**
 - hostname, IPs, uptime, versão, URL do Tailscale Serve, HTTPS/secure context;
 - conexões WebSocket, tamanho do banco, último backup, espaço livre;
@@ -385,7 +389,7 @@ A migração é automática, transacional e idempotente. Ela detecta banco legad
 (`default`). O admin atual continua no tenant default; o superadmin é criado pelo seed.
 
 Detalhes e rollback: **[backend/migrations/MIGRACAO.md](backend/migrations/MIGRACAO.md)**.
-Schema de referência: **[001_multi_tenant.sql](backend/migrations/001_multi_tenant.sql)** (v3), **[002_superadmin_system_sounds.sql](backend/migrations/002_superadmin_system_sounds.sql)** (v4) e **[003_timer_livre_push.sql](backend/migrations/003_timer_livre_push.sql)** (v5).
+Schema de referência: **[001_multi_tenant.sql](backend/migrations/001_multi_tenant.sql)** (v3), **[002_superadmin_system_sounds.sql](backend/migrations/002_superadmin_system_sounds.sql)** (v4), **[003_timer_livre_push.sql](backend/migrations/003_timer_livre_push.sql)** (v5) e **[004_superadmin_password_audit.sql](backend/migrations/004_superadmin_password_audit.sql)** (v6).
 
 ### Restauração manual
 
@@ -410,10 +414,10 @@ superadmin pode criar/baixar backups no menu **Sistema**; o admin do tenant não
 npm test
 ```
 
-**37 testes** cobrem autenticação/refresh, rate limit, adiantado, renovação, encerramento, caixa, isolamento entre
+**38 testes** cobrem autenticação/refresh, rate limit, adiantado, renovação, encerramento, caixa, isolamento entre
 tenants, signup público, suspensão/bloqueio, impersonação auditada, reset/transferência de admin,
 soft/hard delete, métricas, comunicado global, categorias, planos por categoria, QR/PDF, check-in,
-destino do carrinho, telefone, preferências de som, mudança de status com `CartStatusEvent`, timer livre e inscrição push.
+destino do carrinho, telefone, preferências de som, mudança de status com `CartStatusEvent`, timer livre, inscrição push e alteração de senha auditada do superadmin.
 
 ### Manual no celular (via Tailscale)
 
@@ -457,6 +461,7 @@ Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no cel
 - [ ] Transferir admin para outro usuário; confirmar que o novo usuário entra como admin.
 - [ ] Publicar comunicado global e conferir o banner no dashboard de outro tenant.
 - [ ] Soft delete, restaurar e hard delete (com segunda confirmação) de um tenant de teste.
+- [ ] No topo do superadmin, abrir **Alterar senha**, errar a senha atual (erro claro), depois trocar com uma senha de 6+ caracteres e confirmar o toast de sucesso.
 
 **Telefone e som**
 - [ ] Cadastro público sem telefone é recusado; com **(DD) 9XXXX-XXXX** é aceito e salvo em E.164.

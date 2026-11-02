@@ -5,7 +5,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { badRequest, notFound } from '../utils/errors.js';
 import { nowIso, dayBounds } from '../utils/time.js';
-import { hashPassword, publicUser, getUserWithTenant, signAccessToken } from '../services/auth.js';
+import {
+  hashPassword, publicUser, getUserWithTenant, signAccessToken, signRefreshToken,
+  setRefreshCookie, verifyPassword,
+} from '../services/auth.js';
 import { createTenantWithAdmin, serializeTenant } from '../services/tenants.js';
 import { createBackup, listBackups, resolveBackupPath } from '../services/backup.js';
 import { getPlatformSystemInfo } from '../services/system.js';
@@ -30,6 +33,11 @@ const transferSchema = z.object({
 
 const impersonateSchema = z.object({
   motivo: z.string().trim().min(5, 'Informe o motivo do suporte (mínimo 5 caracteres).').max(300),
+});
+
+const passwordSchema = z.object({
+  senha_atual: z.string().min(1, 'Informe a senha atual.').max(200),
+  nova_senha: z.string().min(6, 'A nova senha deve ter pelo menos 6 caracteres.').max(72),
 });
 
 const announcementSchema = z.object({
@@ -81,6 +89,48 @@ function generateTempPassword() {
 
 export function createSuperadminRouter(db) {
   const router = Router();
+
+  router.put('/password', async (req, res, next) => {
+    try {
+      const body = passwordSchema.parse(req.body);
+      const row = db.prepare('SELECT * FROM users WHERE id = ? AND role = ?').get(req.user.id, 'superadmin');
+      if (!row) throw notFound('Superadmin não encontrado.');
+      const valid = await verifyPassword(body.senha_atual, row.senha_hash);
+      if (!valid) throw badRequest('Senha atual incorreta.', 'senha_atual_incorreta');
+      if (body.nova_senha === body.senha_atual) {
+        throw badRequest('A nova senha deve ser diferente da atual.');
+      }
+      const hash = await hashPassword(body.nova_senha);
+      const now = nowIso();
+      const run = db.transaction(() => {
+        db.prepare(
+          `UPDATE users SET senha_hash = ?, must_change_password = 0,
+           token_version = token_version + 1, atualizado_em = ? WHERE id = ?`,
+        ).run(hash, now, row.id);
+        db.prepare(
+          `INSERT INTO audit_logs
+            (tenant_id, superadmin_id, admin_id, tipo, motivo, iniciado_em, finalizado_em, ip, user_agent)
+           VALUES (NULL, ?, NULL, 'password_change', 'Alteração de senha do superadmin', ?, ?, ?, ?)`,
+        ).run(
+          row.id,
+          now,
+          now,
+          req.ip || null,
+          String(req.headers['user-agent'] || '').slice(0, 300) || null,
+        );
+      });
+      run();
+      const fresh = getUserWithTenant(db, row.id);
+      setRefreshCookie(res, signRefreshToken(fresh));
+      res.json({
+        accessToken: signAccessToken(fresh),
+        user: publicUser(fresh),
+        mensagem: 'Senha alterada com sucesso.',
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
 
   router.get('/tenants', (_req, res) => {
     res.json({ items: tenantRows(db).map(serializeItem) });
@@ -315,6 +365,7 @@ export function createSuperadminRouter(db) {
          JOIN tenants t ON t.id = a.tenant_id
          JOIN users s ON s.id = a.superadmin_id
          LEFT JOIN users u ON u.id = a.admin_id
+         WHERE a.tipo = 'impersonation'
          ORDER BY a.iniciado_em DESC LIMIT 50`,
       )
       .all()

@@ -8,6 +8,7 @@ import {
 import { Icon, Logo } from '../components/Icons.jsx';
 import { formatPhoneDisplay, formatPhoneInput, phoneIsValid } from '../lib/phone.js';
 import { SuperadminSystemPage } from './SuperadminSystemPage.jsx';
+import { SuperadminPasswordModal } from '../components/SuperadminPasswordModal.jsx';
 
 const EMPTY_CREATE = { nome: '', adminNome: '', email: '', telefone: '', senha: '' };
 
@@ -29,6 +30,7 @@ export function SuperadminPage() {
   const [modalError, setModalError] = useState('');
   const [modalLoading, setModalLoading] = useState(false);
   const [resetResult, setResetResult] = useState(null);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -193,6 +195,7 @@ export function SuperadminPage() {
         </nav>
         <div className="superadmin-topbar__right">
           <span className="muted small">{user?.nome}</span>
+          <IconButton icon="key" label="Alterar senha" onClick={() => setPasswordOpen(true)} />
           <IconButton icon="refresh" label="Atualizar negócios" onClick={load} />
           <IconButton icon="logout" label="Sair" onClick={handleLogout} />
         </div>
@@ -362,6 +365,8 @@ export function SuperadminPage() {
           )}
         </div>
       </Modal>
+
+      <SuperadminPasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
 
       <Modal open={Boolean(resetResult)} onClose={() => setResetResult(null)} title="Senha temporária gerada" icon="key" size="sm">
         {resetResult && (
