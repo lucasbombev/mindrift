@@ -6552,7 +6552,7 @@ body:has(.bottom-nav) .credit-footer {
   min-width: 105px;
   padding: 9px;
   border-radius: 12px;
-  background: var(--ink);
+  background: var(--navy);
   color: #fff;
   text-align: center;
   align-self: flex-start;
