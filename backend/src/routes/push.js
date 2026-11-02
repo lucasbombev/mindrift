@@ -105,7 +105,7 @@ export function createPushRouter(db) {
       const result = await sendToUser(db, req.tenantId, req.user.id, {
         title: 'Notificação de teste',
         body: 'Se você está vendo isto, o Web Push do Mindrift está funcionando.',
-        url: '/dashboard',
+        url: '/em-uso',
         som: '/sounds/alarme.wav',
       });
       if (result.sent === 0) {

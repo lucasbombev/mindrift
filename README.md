@@ -204,7 +204,8 @@ um registro de auditoria; ao sair, o acesso é encerrado e o token deixa de func
 - **Mais → Categorias**: criar, editar, ativar/desativar. Categorias com carrinhos não são apagadas;
   são desativadas para preservar o histórico.
 - Todo carrinho exige uma categoria; o card mostra **cor + ícone + nome**.
-- O dashboard tem filtros por **categoria** e por **status**.
+- O dashboard tem filtros por **categoria** e por **status**, persistidos por usuário no `localStorage`.
+- A aba **Em uso** tem **Renovar** (para timers com fim previsto) e **Encerrar**, e atualiza por Socket.IO.
 - **Mais → Planos**: um plano pode ser:
   - **global** (`category_id = NULL`): vale para todas as categorias;
   - **específico**: aparece e é aceito somente para carrinhos daquela categoria.
@@ -349,9 +350,9 @@ apenas o indicador verde/vermelho **Sistema operacional**.
 - Rotas: `GET /api/push/public-key`, `GET /api/push/status`, `POST /api/push/subscribe`,
   `DELETE /api/push/unsubscribe`, `POST /api/push/test`.
 - Quando um timer **com fim previsto** chega a zero, o backend envia:
-  `Tempo esgotado!` / `O aluguel do veículo [CÓDIGO] terminou.` / URL `/dashboard`.
+  `Tempo esgotado!` / `O aluguel do veículo [CÓDIGO] terminou.` / URL `/em-uso`.
 - O service worker gerado importa `push-sw.js` e trata `push` e `notificationclick`, abrindo/focando
-  o PWA em `/dashboard`.
+  o PWA em `/em-uso`, toca o alarme local conforme a preferência do usuário e não duplica a notificação nativa.
 - Em **Ajustes → Alertas** e também em **Mais → Som e vibração**, o usuário liga/desliga push,
   envia notificação de teste e vê o estado da permissão.
 - No iOS, o PWA precisa estar **instalado na Tela de Início** para receber Web Push. O toggle só
@@ -517,7 +518,8 @@ Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no cel
 **Identidade, menu e timer livre**
 - [ ] Título/logo/manifest mostram **Mindrift**.
 - [ ] Menu superior mostra **Início, Escanear, Em uso, Histórico, Mais**; Relatórios/Caixa estão em Mais → Administração.
-- [ ] A tela **Em uso** lista todos os aluguéis ativos com foto e timer; **Encerrar aluguel** funciona.
+- [ ] A tela **Em uso** lista todos os aluguéis ativos com foto e timer; **Renovar** e **Encerrar aluguel** funcionam.
+- [ ] Filtrar por Drift + Disponível, navegar para Histórico e voltar: os filtros continuam ativos.
 - [ ] Iniciar com **0 minutos** mostra **Timer livre**, conta para cima, continua sem fim previsto e
       só encerra no botão; digitar o valor no encerramento atualiza o caixa.
 
@@ -528,7 +530,7 @@ Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no cel
 - [ ] Em Ajustes → Alertas (ou Mais → Som e vibração), o toggle reflete o status real do dispositivo; se a permissão estiver bloqueada, aparecem as instruções de Chrome/Safari.
 - [ ] Tocar em **Enviar notificação de teste** com o app em segundo plano e ver a notificação.
 - [ ] Fechar o PWA, deixar um timer curto zerar e confirmar a notificação nativa.
-- [ ] Tocar na notificação e confirmar que abre o app em `/dashboard`.
+- [ ] Tocar na notificação e confirmar que abre o app em `/em-uso`, com apenas uma notificação e o alarme local tocando.
 - [ ] Desativar push e confirmar que não recebe mais; no iPhone, testar com o PWA instalado na Tela de Início.
 
 **Não regressões**

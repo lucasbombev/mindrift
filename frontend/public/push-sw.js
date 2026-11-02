@@ -17,24 +17,29 @@ self.addEventListener('push', (event) => {
     silent: false,
     sound,
     vibrate: [400, 150, 400],
-    data: { url: data.url || '/dashboard', som: sound },
+    data: { url: data.url || '/em-uso', som: sound },
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const target = new URL(event.notification.data?.url || '/dashboard', self.location.origin).href;
+  const target = new URL(event.notification.data?.url || '/em-uso', self.location.origin);
+  target.searchParams.set('push_sound', '1');
+  if (event.notification.data?.som) target.searchParams.set('som', event.notification.data.som);
+  const targetHref = target.href;
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
         if (client.url.startsWith(self.location.origin)) {
           client.focus();
-          if ('navigate' in client) client.navigate(target).catch(() => {});
+          if ('navigate' in client) client.navigate(targetHref).catch(() => {
+            client.postMessage({ type: 'mindrift-push-sound', som: event.notification.data?.som });
+          });
           return;
         }
       }
-      return self.clients.openWindow(target);
+      return self.clients.openWindow(targetHref);
     }),
   );
 });

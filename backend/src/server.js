@@ -175,7 +175,7 @@ const expireCheck = setInterval(() => {
       void sendToTenant(db, session.tenant_id, {
         title: 'Tempo esgotado!',
         body: `O aluguel do veículo ${session.cart_codigo} terminou.`,
-        url: '/dashboard',
+        url: '/em-uso',
         som: `/sounds/${somValido}.wav`,
       });
     } else if (remaining > 0 && remaining <= leadSeconds * 1000 && !notified.has(leadKey)) {

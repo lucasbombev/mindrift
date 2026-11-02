@@ -8,7 +8,7 @@ import { brl, clientName, formatCountdown, formatElapsed, formatTime } from '../
 import { Button, EmptyState, PageHeader, Spinner } from '../components/ui.jsx';
 import { Icon } from '../components/Icons.jsx';
 import { CartArt } from '../components/CartCard.jsx';
-import { EndSessionModal } from '../components/sessionModals.jsx';
+import { EndSessionModal, RenewSessionModal } from '../components/sessionModals.jsx';
 
 export function ActiveSessionsPage() {
   const { isAdmin } = useAuth();
@@ -17,6 +17,7 @@ export function ActiveSessionsPage() {
   const [error, setError] = useState('');
   const [serverOffset, setServerOffset] = useState(0);
   const [endSession, setEndSession] = useState(null);
+  const [renewSession, setRenewSession] = useState(null);
   const now = useNow(500) + serverOffset;
 
   const load = useCallback(async (silent = false) => {
@@ -104,6 +105,9 @@ export function ActiveSessionsPage() {
                     <span><Icon name="user" size={15} /> {session.operadorNome || '—'}</span>
                   </div>
                   <div className="active-session-card__actions">
+                    {!open && (
+                      <Button variant="secondary" icon="plus" onClick={() => setRenewSession(session)}>Renovar</Button>
+                    )}
                     <Button variant="success" icon="stop" onClick={() => setEndSession(session)}>Encerrar aluguel</Button>
                     {isAdmin && <Link className="btn btn--ghost" to="/historico">Ver histórico</Link>}
                   </div>
@@ -121,6 +125,16 @@ export function ActiveSessionsPage() {
           offset={serverOffset}
           onClose={() => setEndSession(null)}
           onSuccess={() => { setEndSession(null); load(true); }}
+        />
+      )}
+
+      {renewSession && (
+        <RenewSessionModal
+          open
+          session={renewSession}
+          offset={serverOffset}
+          onClose={() => setRenewSession(null)}
+          onSuccess={() => { setRenewSession(null); load(true); }}
         />
       )}
     </div>

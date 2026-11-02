@@ -23,6 +23,22 @@ import {
 } from '../components/ui.jsx';
 import { Icon } from '../components/Icons.jsx';
 
+const FILTER_STORAGE_PREFIX = 'mindrift.dashboard.filters.';
+const STATUS_FILTERS = ['all', 'disponivel', 'em_uso', 'carregando', 'manutencao'];
+
+function readSavedFilters(userId) {
+  if (!userId) return { categoryFilter: 'all', statusFilter: 'all' };
+  try {
+    const parsed = JSON.parse(localStorage.getItem(`${FILTER_STORAGE_PREFIX}${userId}`) || '{}');
+    return {
+      categoryFilter: typeof parsed.categoryFilter === 'string' ? parsed.categoryFilter : 'all',
+      statusFilter: STATUS_FILTERS.includes(parsed.statusFilter) ? parsed.statusFilter : 'all',
+    };
+  } catch {
+    return { categoryFilter: 'all', statusFilter: 'all' };
+  }
+}
+
 function DashboardSkeleton() {
   return (
     <div className="container">
@@ -54,12 +70,30 @@ export function DashboardPage() {
   const [modal, setModal] = useState(null);
   const [soundEnabled, setSoundEnabled] = useState(audioReady());
   const [serverOffset, setServerOffset] = useState(0);
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const savedFilters = readSavedFilters(user?.id);
+  const [categoryFilter, setCategoryFilter] = useState(savedFilters.categoryFilter);
+  const [statusFilter, setStatusFilter] = useState(savedFilters.statusFilter);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [statusCart, setStatusCart] = useState(null);
   const localNow = useNow(500);
   const serverNow = localNow + serverOffset;
+
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      localStorage.setItem(
+        `${FILTER_STORAGE_PREFIX}${user.id}`,
+        JSON.stringify({ categoryFilter, statusFilter }),
+      );
+    } catch { /* armazenamento indisponível */ }
+  }, [user?.id, categoryFilter, statusFilter]);
+
+  useEffect(() => {
+    if (!data?.categories?.length || categoryFilter === 'all') return;
+    if (!data.categories.some((category) => String(category.id) === categoryFilter)) {
+      setCategoryFilter('all');
+    }
+  }, [data?.categories, categoryFilter]);
 
   const applyDashboard = useCallback((next) => {
     setData(next);

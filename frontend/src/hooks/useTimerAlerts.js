@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSocketEvent } from '../context/SocketContext.jsx';
 import { audioReady, playSound, primeAudio, subscribeAudio, vibrate } from '../lib/audio.js';
 import { useSoundPrefs } from '../context/SoundContext.jsx';
-import { requestNotifications, showTimerNotification } from '../lib/pwa.js';
+import { requestNotifications } from '../lib/pwa.js';
 
 const ACK_PREFIX = 'drift.ack.';
 
@@ -71,13 +71,6 @@ export function useTimerAlerts({ sessions, alertLeadSeconds, soundEnabled, onSou
     if (stage === 'end') {
       if (soundRef.current) playSound(soundName, { volume });
       if (shouldVibrate) vibrate([500, 160, 500, 160, 500]);
-      if (document.hidden) {
-        showTimerNotification({
-          title: '⏰ Tempo esgotado!',
-          body: `${session.cartCodigo || 'Carrinho'} · ${session.clienteNome || 'Cliente'} — encerre ou renove a sessão.`,
-          tag: `drift-expired-${session.id}`,
-        });
-      }
     } else {
       if (soundRef.current) playSound('beep', { volume });
       if (shouldVibrate) vibrate([160, 90, 160]);
