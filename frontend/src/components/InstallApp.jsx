@@ -23,7 +23,7 @@ export function InstallAppButton({ variant = 'ghost', block = false, label = 'In
   const handleClick = async () => {
     if (canPrompt) {
       const result = await promptInstall();
-      if (result.outcome === 'accepted') toast('Instalando o Drift Rent…', { type: 'success' });
+      if (result.outcome === 'accepted') toast('Instalando o Mindrift…', { type: 'success' });
       else setOpen(true);
       return;
     }

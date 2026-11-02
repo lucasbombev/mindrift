@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button, Avatar } from './ui.jsx';
 import { Icon } from './Icons.jsx';
-import { brl, clientName, formatCountdown, formatTime, paymentLabel, statusLabel } from '../lib/format.js';
+import { brl, clientName, formatCountdown, formatElapsed, formatTime, paymentLabel, statusLabel } from '../lib/format.js';
 
 export function CartArt({ code }) {
   return (
@@ -64,20 +64,27 @@ function statusClass(status) {
 
 export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd, onStatusChange, isAdmin }) {
   const session = cart.sessaoAtiva;
-  const endsAt = session ? new Date(session.fimPrevistoEm).getTime() : 0;
-  const remaining = session ? endsAt - now : null;
-  const { text, expired } = session ? formatCountdown(remaining) : { text: '', expired: false };
-  const urgent = session && remaining <= Math.max(0, alertLeadSeconds) * 1000;
-  const totalDuration = session
+  const openTimer = Boolean(session && !session.fimPrevistoEm);
+  const endsAt = session && !openTimer ? new Date(session.fimPrevistoEm).getTime() : 0;
+  const elapsed = session ? Math.max(0, now - new Date(session.iniciadoEm).getTime()) : 0;
+  const remaining = session && !openTimer ? endsAt - now : null;
+  const { text, expired } = session
+    ? openTimer
+      ? { text: formatElapsed(elapsed), expired: false }
+      : formatCountdown(remaining)
+    : { text: '', expired: false };
+  const urgent = Boolean(session && !openTimer && remaining <= Math.max(0, alertLeadSeconds) * 1000);
+  const totalDuration = session && !openTimer
     ? Math.max(1, endsAt - new Date(session.iniciadoEm).getTime())
     : 1;
-  const progress = session ? Math.max(0, Math.min(100, (remaining / totalDuration) * 100)) : 0;
+  const progress = session && !openTimer ? Math.max(0, Math.min(100, (remaining / totalDuration) * 100)) : 0;
 
   const className = [
     'cart-card',
     `cart-card--${statusClass(cart.status)}`,
     urgent ? 'is-urgent' : '',
     expired ? 'is-expired' : '',
+    openTimer ? 'is-open-timer' : '',
     session ? 'has-session' : '',
   ]
     .filter(Boolean)
@@ -129,7 +136,7 @@ export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd,
               <div className="cart-card__session-name">
                 <strong>{clientName(session.clienteNome)}</strong>
                 <span>
-                  {session.minutosContratados} min · {brl(session.valorCentavos)}
+                  {openTimer ? 'Timer livre' : `${session.minutosContratados} min`} · {brl(session.valorCentavos)}
                 </span>
               </div>
               {urgent && (
@@ -140,10 +147,10 @@ export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd,
               )}
             </div>
 
-            <div className={`timer-display ${expired ? 'is-expired' : urgent ? 'is-urgent' : ''}`}>
+            <div className={`timer-display ${expired ? 'is-expired' : urgent ? 'is-urgent' : ''} ${openTimer ? 'is-open' : ''}`}>
               <span className="timer-display__value">{text}</span>
               <span className="timer-display__label">
-                {expired ? 'tempo excedido' : 'restantes'}
+                {openTimer ? 'decorrido' : expired ? 'tempo excedido' : 'restantes'}
               </span>
             </div>
 
@@ -159,7 +166,7 @@ export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd,
                 <Icon name="clock" size={14} /> início {formatTime(session.iniciadoEm)}
               </span>
               <span>
-                <Icon name="timer" size={14} /> fim {formatTime(session.fimPrevistoEm)}
+                <Icon name="timer" size={14} /> {openTimer ? 'sem fim previsto' : `fim ${formatTime(session.fimPrevistoEm)}`}
               </span>
             </div>
 
@@ -187,9 +194,11 @@ export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd,
             </div>
 
             <div className="cart-card__actions">
-              <Button variant="secondary" size="sm" icon="plus" onClick={() => onRenew(session, cart)}>
-                Renovar
-              </Button>
+              {!openTimer && (
+                <Button variant="secondary" size="sm" icon="plus" onClick={() => onRenew(session, cart)}>
+                  Renovar
+                </Button>
+              )}
               <Button variant="success" size="sm" icon="stop" onClick={() => onEnd(session, cart)}>
                 Encerrar
               </Button>

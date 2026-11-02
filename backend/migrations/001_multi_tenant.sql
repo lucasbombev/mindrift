@@ -1,5 +1,5 @@
 -- ============================================================================
--- Drift Rent — migração estrutural 001: multi-tenant + categorias + QR + cliente opcional
+-- Mindrift — migração estrutural 001: multi-tenant + categorias + QR + cliente opcional
 -- ============================================================================
 -- IMPORTANTE
 --   * Este arquivo é o schema final de referência. O runner automático em

@@ -12,6 +12,8 @@ import { roleLabel } from '../lib/format.js';
 import { formatPhoneDisplay } from '../lib/phone.js';
 
 const ADMIN_LINKS = [
+  { to: '/relatorios', label: 'Relatórios', icon: 'chart', desc: 'Faturamento, horários e pendências' },
+  { to: '/caixa', label: 'Caixa', icon: 'cash', desc: 'Recebimentos e fechamento' },
   { to: '/carrinhos', label: 'Carrinhos', icon: 'cart', desc: 'Fotos, categorias e status' },
   { to: '/categorias', label: 'Categorias', icon: 'tag', desc: 'Drift, kart, patinete e mais' },
   { to: '/planos', label: 'Planos', icon: 'timer', desc: 'Tempos, valores e categorias' },
@@ -35,19 +37,12 @@ export function AppLayout() {
     setMoreOpen(false);
   }, [location.pathname]);
 
-  const mainLinks = isAdmin
-    ? [
-        { to: '/', label: 'Início', icon: 'home', end: true },
-        { to: '/scan', label: 'Escanear', icon: 'scan' },
-        { to: '/historico', label: 'Histórico', icon: 'history' },
-        { to: '/relatorios', label: 'Relatórios', icon: 'chart' },
-        { to: '/caixa', label: 'Caixa', icon: 'cash' },
-      ]
-    : [
-        { to: '/', label: 'Início', icon: 'home', end: true },
-        { to: '/scan', label: 'Escanear', icon: 'scan' },
-        { to: '/historico', label: 'Histórico', icon: 'history' },
-      ];
+  const mainLinks = [
+    { to: '/', label: 'Início', icon: 'home', end: true },
+    { to: '/scan', label: 'Escanear', icon: 'scan' },
+    { to: '/em-uso', label: 'Em uso', icon: 'timer' },
+    { to: '/historico', label: 'Histórico', icon: 'history' },
+  ];
 
   const isMoreActive =
     isAdmin && ADMIN_LINKS.some((link) => location.pathname.startsWith(link.to));

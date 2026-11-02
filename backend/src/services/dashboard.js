@@ -30,7 +30,7 @@ export function serializeCart(row) {
 export function getDashboard(db, tenantId) {
   const now = new Date();
   const { start, end } = dayBounds();
-  const nomeEstabelecimento = getSetting(db, tenantId, 'nome_estabelecimento', 'Drift Rent');
+  const nomeEstabelecimento = getSetting(db, tenantId, 'nome_estabelecimento', 'Mindrift');
   const alertLeadSeconds = Number(getSetting(db, tenantId, 'alert_lead_seconds', '60')) || 0;
   const somFim = getSetting(db, tenantId, 'som_fim', 'alarme');
   const somRepetir = getSetting(db, tenantId, 'som_repetir', '1') === '1';
@@ -64,7 +64,7 @@ export function getDashboard(db, tenantId) {
        JOIN categories cat ON cat.id = c.category_id
        LEFT JOIN users u ON u.id = s.operador_id
        WHERE s.tenant_id = ? AND s.status = 'em_andamento' AND s.excluida_em IS NULL
-       ORDER BY s.fim_previsto_em ASC`,
+       ORDER BY s.fim_previsto_em IS NULL, s.fim_previsto_em ASC`,
     )
     .all(tenantId);
 
@@ -93,7 +93,7 @@ export function getDashboard(db, tenantId) {
       adiantadoEm: row.adiantado_em || null,
       pagoEm: row.pago_em || null,
       iniciadoEm: row.iniciado_em,
-      fimPrevistoEm: row.fim_previsto_em,
+      fimPrevistoEm: row.fim_previsto_em || null,
       operadorNome: row.operador_nome || null,
       pago: Boolean(row.pago),
     };

@@ -11,6 +11,7 @@ import { authenticateToken } from './middleware/auth.js';
 import { getDashboard } from './services/dashboard.js';
 import { getLanUrls } from './services/system.js';
 import { installFileLogger } from './utils/logger.js';
+import { sendToTenant } from './services/push.js';
 import {
   startBackupScheduler,
   startupBackupIfNeeded,
@@ -120,7 +121,8 @@ const expireCheck = setInterval(() => {
          FROM sessions s
          JOIN carts c ON c.id = s.cart_id
          JOIN tenants t ON t.id = s.tenant_id
-         WHERE s.status = 'em_andamento' AND s.excluida_em IS NULL`,
+         WHERE s.status = 'em_andamento' AND s.excluida_em IS NULL
+           AND s.fim_previsto_em IS NOT NULL`,
       )
       .all();
   } catch (err) {
@@ -152,6 +154,11 @@ const expireCheck = setInterval(() => {
         cartCodigo: session.cart_codigo,
         fimPrevistoEm: session.fim_previsto_em,
         serverNow: now,
+      });
+      void sendToTenant(db, session.tenant_id, {
+        title: 'Tempo esgotado!',
+        body: `O aluguel do veículo ${session.cart_codigo} terminou.`,
+        url: '/dashboard',
       });
     } else if (remaining > 0 && remaining <= leadSeconds * 1000 && !notified.has(leadKey)) {
       notified.add(leadKey);
@@ -198,7 +205,7 @@ const port = config.port;
 httpServer.listen(port, config.host, () => {
   const urls = getLanUrls(port);
   console.log('');
-  console.log('  🏁 Drift Rent — servidor no ar');
+  console.log('  🏁 Mindrift — servidor no ar');
   console.log(`  Local:   http://localhost:${port}`);
   for (const url of urls) console.log(`  Rede:    ${url}`);
   if (urls.length === 0) {

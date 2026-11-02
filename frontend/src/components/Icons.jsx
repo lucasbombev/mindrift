@@ -50,6 +50,12 @@ const paths = {
       <circle cx="9" cy="17" r="2" />
     </>
   ),
+  bell: (
+    <>
+      <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+      <path d="M10 21h4" />
+    </>
+  ),
   keyboard: (
     <>
       <rect x="2.5" y="6" width="19" height="12" rx="2.5" />
@@ -301,7 +307,7 @@ export function Logo({ size = 44, withWordmark = false, className = '' }) {
         height={size}
         viewBox="0 0 64 64"
         role="img"
-        aria-label="Drift Rent"
+        aria-label="Mindrift"
         style={{ flex: '0 0 auto', borderRadius: size * 0.26, display: 'block' }}
       >
         <rect width="64" height="64" rx="16" fill="#0b1220" />
@@ -318,7 +324,7 @@ export function Logo({ size = 44, withWordmark = false, className = '' }) {
       </svg>
       {withWordmark && (
         <span className="logo__wordmark">
-          <strong>Drift Rent</strong>
+          <strong>Mindrift</strong>
           <span>GESTÃO DE PISTA</span>
         </span>
       )}

@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { SOUND_OPTIONS } from '../lib/audio.js';
 import { Button, Field, InlineError, Modal, Toggle } from './ui.jsx';
 import { Icon } from './Icons.jsx';
+import { PushSettings } from './PushSettings.jsx';
 
 export function SoundSettingsModal({ open, onClose }) {
   const { prefs, save, test } = useSoundPrefs();
@@ -119,6 +120,7 @@ export function SoundSettingsModal({ open, onClose }) {
           Preferências são salvas na sua conta e continuam após fechar e reabrir o PWA. A
           repetição até dispensar é definida pelo negócio.
         </p>
+        <PushSettings compact />
       </form>
     </Modal>
   );

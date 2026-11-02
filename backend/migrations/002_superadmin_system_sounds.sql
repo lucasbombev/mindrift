@@ -1,5 +1,5 @@
 -- ============================================================================
--- Drift Rent — migração 002: superadmin/sistema, telefone, sons e status
+-- Mindrift — migração 002: superadmin/sistema, telefone, sons e status
 -- ============================================================================
 -- O runner em backend/src/db.js adiciona as colunas via ALTER TABLE apenas se
 -- ainda não existirem e cria as tabelas abaixo com IF NOT EXISTS. O backup é

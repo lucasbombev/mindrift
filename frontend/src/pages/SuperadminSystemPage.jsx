@@ -74,7 +74,7 @@ export function SuperadminSystemPage({ onBack }) {
     filename,
   ).catch((err) => setError(err.message));
 
-  const downloadLog = () => downloadAuthenticated('/superadmin/system/logs/download', 'drift-rent.log')
+  const downloadLog = () => downloadAuthenticated('/superadmin/system/logs/download', 'mindrift.log')
     .catch((err) => setError(err.message));
 
   const handleLogout = async () => {

@@ -82,6 +82,15 @@ export function formatDurationMinutes(minutes) {
   return rest ? `${h}h ${rest}min` : `${h}h`;
 }
 
+export function formatElapsed(ms) {
+  const total = Math.max(0, Math.floor(Number(ms) / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  if (hours > 0) return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 export function formatCountdown(ms) {
   const expired = ms <= 0;
   const total = Math.ceil(Math.abs(ms) / 1000);

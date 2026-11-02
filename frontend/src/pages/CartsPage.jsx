@@ -384,7 +384,7 @@ export function CartsPage() {
                   {active ? (
                     <div className="admin-cart__active">
                       <Badge tone="blue">Em uso por {clientName(cart.sessaoAtiva.clienteNome)}</Badge>
-                      <span>Termina às {formatTime(cart.sessaoAtiva.fimPrevistoEm)}</span>
+                      <span>{cart.sessaoAtiva.fimPrevistoEm ? `Termina às ${formatTime(cart.sessaoAtiva.fimPrevistoEm)}` : 'Timer livre em andamento'}</span>
                     </div>
                   ) : (
                     <div className="admin-cart__quick">

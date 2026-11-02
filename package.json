@@ -1,8 +1,8 @@
 {
-  "name": "drift-rent",
+  "name": "mindrift",
   "version": "1.0.0",
   "private": true,
-  "description": "SaaS local (LAN) para gestão de aluguel de carrinhos de drift",
+  "description": "SaaS local (LAN) para gestão de aluguel de veículos",
   "workspaces": [
     "backend",
     "frontend"

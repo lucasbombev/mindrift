@@ -1,7 +1,7 @@
 services:
-  drift-rent:
+  mindrift:
     build: .
-    container_name: drift-rent
+    container_name: mindrift
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -16,7 +16,7 @@ services:
       DB_PATH: data/drift.db
       UPLOAD_DIR: uploads
       BACKUP_DIR: backups
-      LOG_PATH: logs/drift.log
+      LOG_PATH: logs/mindrift.log
       ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-12h}
       REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL:-30d}
       BACKUP_HOUR: ${BACKUP_HOUR:-3}
@@ -27,6 +27,9 @@ services:
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-superadmin123}
       SUPERADMIN_NAME: ${SUPERADMIN_NAME:-Superadministrador}
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:contato@mindrift.local}
     volumes:
       - ./backend/data:/app/backend/data
       - ./backend/uploads:/app/backend/uploads

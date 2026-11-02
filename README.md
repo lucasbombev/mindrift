@@ -1,4 +1,4 @@
-# 🏁 Drift Rent
+# 🏁 Mindrift
 
 SaaS local (LAN/Tailscale) para alugar carrinhos de drift, kart, patinete, quadriciclo e outras
 categorias por tempo. O notebook da pista roda **servidor + SQLite**; operadores e administradores
@@ -18,6 +18,22 @@ sessões, caixa e configurações. Um administrador **nunca** acessa dados de ou
 - **Telefone** do usuário com máscara brasileira e E.164.
 - **Som configurável** por tenant e por usuário (6 sons locais, volume, vibração e repetição).
 - **Operador pode alterar status** do carrinho com motivo e histórico (`CartStatusEvent`).
+- **Nome Mindrift** em toda a interface, PWA e manifest; rodapé com crédito ao GitHub.
+- **Menu reorganizado**: Início, Escanear, Em uso, Histórico e Mais; Relatórios/Caixa em **Mais → Administração**.
+- **Timer livre** (0 minutos) progressivo, sem fim previsto, encerrado manualmente com valor informado.
+- **Web Push** opcional para avisar o tempo esgotado com o app fechado.
+
+---
+
+## 0. Identidade e navegação
+
+- Nome do app: **Mindrift** (título da aba, logo, login, manifest, health e documentação).
+- Rodapé global: **desenvolvido por [github.com/lucasbombev](https://github.com/lucasbombev)**.
+- Menu superior: **Início · Escanear · Em uso · Histórico · Mais**.
+- **Mais → Administração** (admin): Relatórios, Caixa, Carrinhos, Categorias, Planos, QR Codes,
+  Usuários e Ajustes.
+- **Em uso** lista todas as sessões ativas com foto, carrinho, cliente, timer (regressivo ou livre)
+  e botão **Encerrar aluguel**.
 
 ---
 
@@ -101,7 +117,7 @@ O Tailscale usa certificado confiável; **não é necessário instalar CA local*
 - **Safari iOS:** abra a URL HTTPS → **Compartilhar** → **Adicionar à Tela de Início**.
 - No notebook, `localhost` também é contexto seguro.
 
-O app tem manifest **Carrinhos de Drift** / **Drift**, modo standalone, orientação retrato,
+O app tem manifest **Mindrift** / **Mindrift**, modo standalone, orientação retrato,
 service worker com precache do shell, `/api/*` em **NetworkOnly** e banner
 **“Nova versão disponível — atualizar”**. O timer nunca é recarregado automaticamente.
 
@@ -211,6 +227,8 @@ Categorias iniciais:
 - Pelo QR: **Escanear** → câmera → tela do carrinho → **Iniciar aluguel agora**.
 - O nome do cliente é **opcional**; se vazio, a UI mostra **“Cliente não informado”**.
 - Escolha plano (filtrado pela categoria) ou valor avulso.
+- Em **Outro valor**, digite **0 minutos** para iniciar um **timer livre**: o tempo conta para cima,
+  não tem fim previsto e não gera alertas automáticos. O valor é digitado no encerramento.
 - O timer começa no servidor; fechar o app não interrompe.
 
 ### Encerrar (check-in)
@@ -222,7 +240,8 @@ Ao encerrar, o operador escolhe em **1 toque** o destino:
 3. **Enviar para Manutenção**
 
 O pagamento pode ser recebido no encerramento ou ficar pendente no histórico. O carrinho vai para o
-status escolhido independentemente do pagamento.
+status escolhido independentemente do pagamento. Em timer livre, o operador informa o **valor a
+cobrar** no encerramento; a duração decorrida aparece no modal.
 
 ### Outros status e menu ⋮
 
@@ -308,6 +327,25 @@ Tailscale Serve, HTTPS/secure context, conexões WebSocket, tamanho do banco, ú
 livre, tail de logs, download de log/backup e **Rodar backup agora**. O painel do tenant mostra
 apenas o indicador verde/vermelho **Sistema operacional**.
 
+## 7.3 Web Push (notificações em segundo plano)
+
+- Backend usa `web-push` + chaves **VAPID** (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
+  `VAPID_SUBJECT`). Gere com `npx web-push generate-vapid-keys --json` e coloque no
+  `backend/.env` (as chaves já foram geradas neste ambiente).
+- Tabela `push_subscriptions`: uma inscrição por dispositivo, vinculada a usuário e tenant.
+- Rotas: `GET /api/push/public-key`, `GET /api/push/status`, `POST /api/push/subscribe`,
+  `DELETE /api/push/unsubscribe`, `POST /api/push/test`.
+- Quando um timer **com fim previsto** chega a zero, o backend envia:
+  `Tempo esgotado!` / `O aluguel do veículo [CÓDIGO] terminou.` / URL `/dashboard`.
+- O service worker gerado importa `push-sw.js` e trata `push` e `notificationclick`, abrindo/focando
+  o PWA em `/dashboard`.
+- Em **Ajustes → Alertas** e também em **Mais → Som e vibração**, o usuário liga/desliga push,
+  envia notificação de teste e vê o estado da permissão.
+- No iOS, o PWA precisa estar **instalado na Tela de Início** para receber Web Push. O toggle só
+  funciona em HTTPS confiável (Tailscale) ou localhost.
+- Se o usuário bloquear a permissão, o app mostra instruções para liberar nas configurações do
+  navegador/PWA.
+
 ## 8. Perfis e permissões
 
 | Ação | Superadmin | Admin do tenant | Operador |
@@ -347,7 +385,7 @@ A migração é automática, transacional e idempotente. Ela detecta banco legad
 (`default`). O admin atual continua no tenant default; o superadmin é criado pelo seed.
 
 Detalhes e rollback: **[backend/migrations/MIGRACAO.md](backend/migrations/MIGRACAO.md)**.
-Schema de referência: **[backend/migrations/001_multi_tenant.sql](backend/migrations/001_multi_tenant.sql)** (v3) e **[backend/migrations/002_superadmin_system_sounds.sql](backend/migrations/002_superadmin_system_sounds.sql)** (v4).
+Schema de referência: **[001_multi_tenant.sql](backend/migrations/001_multi_tenant.sql)** (v3), **[002_superadmin_system_sounds.sql](backend/migrations/002_superadmin_system_sounds.sql)** (v4) e **[003_timer_livre_push.sql](backend/migrations/003_timer_livre_push.sql)** (v5).
 
 ### Restauração manual
 
@@ -372,10 +410,10 @@ superadmin pode criar/baixar backups no menu **Sistema**; o admin do tenant não
 npm test
 ```
 
-**34 testes** cobrem autenticação/refresh, rate limit, adiantado, renovação, encerramento, caixa, isolamento entre
+**37 testes** cobrem autenticação/refresh, rate limit, adiantado, renovação, encerramento, caixa, isolamento entre
 tenants, signup público, suspensão/bloqueio, impersonação auditada, reset/transferência de admin,
 soft/hard delete, métricas, comunicado global, categorias, planos por categoria, QR/PDF, check-in,
-destino do carrinho, telefone, preferências de som e mudança de status com `CartStatusEvent`.
+destino do carrinho, telefone, preferências de som, mudança de status com `CartStatusEvent`, timer livre e inscrição push.
 
 ### Manual no celular (via Tailscale)
 
@@ -433,6 +471,20 @@ Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no cel
 - [ ] Em carrinho em uso, o botão **⋮** está desabilitado com o aviso “Encerre a sessão primeiro”.
 - [ ] Voltar para disponível/carregando e conferir cada transição.
 
+**Identidade, menu e timer livre**
+- [ ] Título/logo/manifest mostram **Mindrift**; o rodapé tem o link para github.com/lucasbombev.
+- [ ] Menu superior mostra **Início, Escanear, Em uso, Histórico, Mais**; Relatórios/Caixa estão em Mais → Administração.
+- [ ] A tela **Em uso** lista todos os aluguéis ativos com foto e timer; **Encerrar aluguel** funciona.
+- [ ] Iniciar com **0 minutos** mostra **Timer livre**, conta para cima, continua sem fim previsto e
+      só encerra no botão; digitar o valor no encerramento atualiza o caixa.
+
+**Web Push**
+- [ ] Em Ajustes → Alertas (ou Mais → Som e vibração), ativar push e permitir notificações.
+- [ ] Tocar em **Enviar notificação de teste** com o app em segundo plano e ver a notificação.
+- [ ] Fechar o PWA, deixar um timer curto zerar e confirmar a notificação nativa.
+- [ ] Tocar na notificação e confirmar que abre o app em `/dashboard`.
+- [ ] Desativar push e confirmar que não recebe mais; no iPhone, testar com o PWA instalado na Tela de Início.
+
 **Não regressões**
 - [ ] Timer continua no servidor ao fechar/abrir o app.
 - [ ] Renovação soma tempo e mantém o adiantado; adicional fica pendente.
@@ -452,8 +504,11 @@ JWT_REFRESH_SECRET=...
 DB_PATH=data/drift.db
 UPLOAD_DIR=uploads
 BACKUP_DIR=backups
-LOG_PATH=logs/drift.log
+LOG_PATH=logs/mindrift.log
 TAILSCALE_URL=
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:contato@mindrift.local
 
 SUPERADMIN_USERNAME=superadmin
 SUPERADMIN_PASSWORD=superadmin123

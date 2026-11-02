@@ -94,10 +94,10 @@ CREATE TABLE IF NOT EXISTS sessions (
   cliente_nome TEXT,
   plano_id INTEGER REFERENCES pricing_plans(id) ON DELETE SET NULL,
   plano_nome TEXT NOT NULL,
-  minutos_contratados INTEGER NOT NULL CHECK (minutos_contratados > 0),
+  minutos_contratados INTEGER NOT NULL CHECK (minutos_contratados >= 0),
   valor_centavos INTEGER NOT NULL CHECK (valor_centavos >= 0),
   iniciado_em TEXT NOT NULL,
-  fim_previsto_em TEXT NOT NULL,
+  fim_previsto_em TEXT,
   encerrado_em TEXT,
   duracao_segundos INTEGER,
   status TEXT NOT NULL DEFAULT 'em_andamento'
@@ -195,6 +195,17 @@ CREATE TABLE IF NOT EXISTS global_announcements (
   atualizado_em TEXT NOT NULL
 );
 
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  criado_em TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version INTEGER PRIMARY KEY,
   applied_at TEXT NOT NULL
@@ -238,6 +249,8 @@ CREATE INDEX IF NOT EXISTS idx_cart_status_events_tenant ON cart_status_events(t
 CREATE INDEX IF NOT EXISTS idx_cart_status_events_cart ON cart_status_events(cart_id, criado_em);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant ON audit_logs(tenant_id, iniciado_em);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_superadmin ON audit_logs(superadmin_id, iniciado_em);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_tenant ON push_subscriptions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);
 
 CREATE INDEX IF NOT EXISTS idx_cash_closures_tenant ON cash_closures(tenant_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_cash_closures_tenant_data
@@ -431,6 +444,86 @@ function migrateV4(db, { makeBackup = true } = {}) {
   db.pragma('user_version = 4');
 }
 
+
+/**
+ * v5 — timer livre (fim_previsto_em nullable / minutos >= 0) e push.
+ * A tabela sessions precisa ser reconstruída porque as constraints antigas
+ * impediam NULL e 0. O restante é apenas CREATE TABLE IF NOT EXISTS.
+ */
+function migrateV5(db, { makeBackup = true } = {}) {
+  const info = db.prepare('PRAGMA table_info(sessions)').all();
+  const fim = info.find((column) => column.name === 'fim_previsto_em');
+  const minutes = info.find((column) => column.name === 'minutos_contratados');
+  const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='sessions'").get()?.sql || '';
+  const needsRebuild = Boolean(fim?.notnull) || /minutos_contratados\s*>\s*0/i.test(sql);
+  if (needsRebuild && makeBackup && tableExists(db, 'sessions')) createMigrationBackup(db);
+
+  if (needsRebuild) {
+    db.pragma('foreign_keys = OFF');
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.exec(`
+        CREATE TABLE sessions_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tenant_id INTEGER NOT NULL REFERENCES tenants(id),
+          cart_id INTEGER NOT NULL REFERENCES carts(id),
+          cliente_nome TEXT,
+          plano_id INTEGER REFERENCES pricing_plans(id) ON DELETE SET NULL,
+          plano_nome TEXT NOT NULL,
+          minutos_contratados INTEGER NOT NULL CHECK (minutos_contratados >= 0),
+          valor_centavos INTEGER NOT NULL CHECK (valor_centavos >= 0),
+          iniciado_em TEXT NOT NULL,
+          fim_previsto_em TEXT,
+          encerrado_em TEXT,
+          duracao_segundos INTEGER,
+          status TEXT NOT NULL DEFAULT 'em_andamento'
+            CHECK (status IN ('em_andamento', 'encerrada', 'cancelada')),
+          pago INTEGER NOT NULL DEFAULT 0,
+          forma_pagamento TEXT CHECK (forma_pagamento IN ('dinheiro', 'pix', 'cartao')),
+          pagamento_adiantado INTEGER NOT NULL DEFAULT 0,
+          valor_adiantado_centavos INTEGER NOT NULL DEFAULT 0,
+          forma_adiantado TEXT,
+          adiantado_em TEXT,
+          operador_id INTEGER NOT NULL REFERENCES users(id),
+          observacao TEXT,
+          motivo_cancelamento TEXT,
+          pago_em TEXT,
+          criado_em TEXT NOT NULL,
+          atualizado_em TEXT NOT NULL,
+          excluida_em TEXT,
+          excluida_por INTEGER REFERENCES users(id)
+        )
+      `);
+      db.exec(`
+        INSERT INTO sessions_new
+          (id, tenant_id, cart_id, cliente_nome, plano_id, plano_nome, minutos_contratados,
+           valor_centavos, iniciado_em, fim_previsto_em, encerrado_em, duracao_segundos,
+           status, pago, forma_pagamento, pagamento_adiantado, valor_adiantado_centavos,
+           forma_adiantado, adiantado_em, operador_id, observacao, motivo_cancelamento,
+           pago_em, criado_em, atualizado_em, excluida_em, excluida_por)
+        SELECT id, tenant_id, cart_id, cliente_nome, plano_id, plano_nome, minutos_contratados,
+               valor_centavos, iniciado_em, fim_previsto_em, encerrado_em, duracao_segundos,
+               status, pago, forma_pagamento, pagamento_adiantado, valor_adiantado_centavos,
+               forma_adiantado, adiantado_em, operador_id, observacao, motivo_cancelamento,
+               pago_em, criado_em, atualizado_em, excluida_em, excluida_por
+        FROM sessions
+      `);
+      db.exec('DROP TABLE sessions');
+      db.exec('ALTER TABLE sessions_new RENAME TO sessions');
+      db.exec('COMMIT');
+    } catch (err) {
+      try { db.exec('ROLLBACK'); } catch { /* noop */ }
+      db.pragma('foreign_keys = ON');
+      throw err;
+    }
+    db.pragma('foreign_keys = ON');
+  }
+  db.exec(SCHEMA_TABLES);
+  db.exec(SCHEMA_INDEXES);
+  db.prepare('INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (5, ?)').run(nowIso());
+  db.pragma('user_version = 5');
+}
+
 export function ensureDefaultTenant(db) {
   let tenant = db.prepare("SELECT * FROM tenants WHERE slug = 'default'").get();
   if (!tenant) {
@@ -461,11 +554,13 @@ export function openDb(filePath = config.dbPath) {
   if (!legacy) {
     db.exec(SCHEMA_TABLES);
     migrateV4(db, { makeBackup: usersExist });
+    migrateV5(db, { makeBackup: usersExist });
     ensureDefaultTenant(db);
   } else {
     migrateLegacy(db);
     ensureDefaultTenant(db);
     migrateV4(db, { makeBackup: false });
+    migrateV5(db, { makeBackup: false });
   }
 
   return db;

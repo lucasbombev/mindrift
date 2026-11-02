@@ -36,7 +36,7 @@ export function serializeSession(row) {
     minutosContratados: row.minutos_contratados,
     valorCentavos: row.valor_centavos,
     iniciadoEm: row.iniciado_em,
-    fimPrevistoEm: row.fim_previsto_em,
+    fimPrevistoEm: row.fim_previsto_em || null,
     encerradoEm: row.encerrado_em,
     duracaoSegundos: row.duracao_segundos,
     status: row.status,
@@ -97,8 +97,8 @@ function resolvePricing(db, tenantId, input, categoryId) {
   }
   const minutos = Number(input.minutos);
   const valorCentavos = Number(input.valor_centavos);
-  if (!Number.isInteger(minutos) || minutos < 1 || minutos > 1440) {
-    throw badRequest('Informe os minutos entre 1 e 1440.');
+  if (!Number.isInteger(minutos) || minutos < 0 || minutos > 1440) {
+    throw badRequest('Informe os minutos entre 0 (livre) e 1440.');
   }
   if (!Number.isInteger(valorCentavos) || valorCentavos < 0 || valorCentavos > 1_000_000) {
     throw badRequest('Informe um valor válido.');
@@ -142,9 +142,12 @@ export function startSession(db, tenantId, input, operator) {
     if (active) throw conflict('Este carrinho já possui uma sessão ativa.', 'carrinho_em_uso');
 
     const pricing = resolvePricing(db, tenantId, input, cart.category_id);
+    if (pricing.minutos === 0 && adiantado) {
+      throw badRequest('Timer livre deve ser pago no encerramento.');
+    }
     const startedAt = new Date();
     const startedIso = startedAt.toISOString();
-    const endsAt = addMinutes(startedAt, pricing.minutos);
+    const endsAt = pricing.minutos > 0 ? addMinutes(startedAt, pricing.minutos) : null;
     const now = nowIso();
     const forma = adiantado ? input.forma_pagamento : null;
     const cliente = normalizeClientName(input.cliente_nome);
@@ -167,7 +170,7 @@ export function startSession(db, tenantId, input, operator) {
         pricing.minutos,
         pricing.valorCentavos,
         startedIso,
-        endsAt.toISOString(),
+        endsAt ? endsAt.toISOString() : null,
         adiantado ? 1 : 0,
         forma,
         adiantado ? startedIso : null,
@@ -197,7 +200,7 @@ export function startSession(db, tenantId, input, operator) {
       pago: adiantado,
       formaPagamento: forma,
       inicio: startedIso,
-      fimPrevisto: endsAt.toISOString(),
+      fimPrevisto: endsAt ? endsAt.toISOString() : null,
     });
     if (adiantado) {
       logEvent(db, tenantId, sessionId, 'pagamento', operator.id, {
@@ -225,6 +228,9 @@ export function renewSession(db, tenantId, id, input, operator) {
       )
       .get(id, tenantId);
     if (!row) throw notFound('Sessão ativa não encontrada.');
+    if (!row.fim_previsto_em) {
+      throw conflict('Timer livre não pode ser renovado. Encerre o aluguel para cobrar o tempo.', 'timer_livre');
+    }
     const pricing = resolvePricing(db, tenantId, input, row.cart_category_id);
 
     const base = Math.max(Date.now(), new Date(row.fim_previsto_em).getTime());
@@ -284,7 +290,22 @@ export function endSession(db, tenantId, id, input, operator) {
       .get(id, tenantId);
     if (!row) throw notFound('Sessão ativa não encontrada.');
 
-    const amounts = sessionAmounts(row);
+    let valorFinal = Number(row.valor_centavos);
+    if (input.valor_final_centavos !== undefined) {
+      if (row.fim_previsto_em) {
+        throw badRequest('O valor manual no encerramento é exclusivo do timer livre.');
+      }
+      if (
+        !Number.isInteger(Number(input.valor_final_centavos)) ||
+        Number(input.valor_final_centavos) < 0 ||
+        Number(input.valor_final_centavos) > 1_000_000
+      ) {
+        throw badRequest('Informe um valor final válido.');
+      }
+      valorFinal = Number(input.valor_final_centavos);
+    }
+    const effective = { ...row, valor_centavos: valorFinal };
+    const amounts = sessionAmounts(effective);
     const restante = amounts.pendenteCentavos;
     const receberAgora = restante > 0 ? Boolean(input.pago) : true;
     if (restante > 0) assertPayment(input.forma_pagamento, receberAgora);
@@ -313,10 +334,17 @@ export function endSession(db, tenantId, id, input, operator) {
         : row.forma_pagamento || row.forma_adiantado || null;
 
     db.prepare(
-      `UPDATE sessions SET status = 'encerrada', encerrado_em = ?, duracao_segundos = ?,
+      `UPDATE sessions SET valor_centavos = ?, status = 'encerrada', encerrado_em = ?, duracao_segundos = ?,
        pago = ?, forma_pagamento = ?, pago_em = ?, atualizado_em = ?
        WHERE id = ? AND tenant_id = ?`,
-    ).run(endedIso, duration, nextPago, nextForma, nextPagoEm, now, id, tenantId);
+    ).run(valorFinal, endedIso, duration, nextPago, nextForma, nextPagoEm, now, id, tenantId);
+    if (valorFinal !== row.valor_centavos) {
+      logEvent(db, tenantId, id, 'edicao_valor', operator.id, {
+        valorAnteriorCentavos: row.valor_centavos,
+        valorNovoCentavos: valorFinal,
+        origem: 'encerramento_timer_livre',
+      });
+    }
 
     db.prepare(
       'UPDATE carts SET status = ?, atualizado_em = ? WHERE id = ? AND tenant_id = ?',
@@ -326,7 +354,7 @@ export function endSession(db, tenantId, id, input, operator) {
     logEvent(db, tenantId, id, 'encerramento', operator.id, {
       encerradoEm: endedIso,
       duracaoSegundos: duration,
-      valorCentavos: row.valor_centavos,
+      valorCentavos: valorFinal,
       valorAdiantadoCentavos: amounts.adiantadoCentavos,
       valorRestanteCentavos: restante,
       pago: Boolean(nextPago),

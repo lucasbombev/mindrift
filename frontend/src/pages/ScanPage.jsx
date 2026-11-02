@@ -4,7 +4,7 @@ import { api } from '../lib/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useNow } from '../hooks/useServerClock.js';
-import { brl, clientName, formatCountdown, formatTime, paymentLabel, statusLabel } from '../lib/format.js';
+import { brl, clientName, formatCountdown, formatElapsed, formatTime, paymentLabel, statusLabel } from '../lib/format.js';
 import { Badge, Button, Field, InlineError, InfoNote, Input, PageHeader, Spinner } from '../components/ui.jsx';
 import { Icon } from '../components/Icons.jsx';
 import {
@@ -92,10 +92,16 @@ function ScanResult({ token, onScanAnother }) {
 
   if (!data) return null;
   const { cart, activeSession } = data;
-  const remaining = activeSession
+  const openTimer = Boolean(activeSession && !activeSession.fimPrevistoEm);
+  const remaining = activeSession && !openTimer
     ? new Date(activeSession.fimPrevistoEm).getTime() - now
     : null;
-  const countdown = remaining === null ? null : formatCountdown(remaining);
+  const elapsed = activeSession ? Math.max(0, now - new Date(activeSession.iniciadoEm).getTime()) : 0;
+  const countdown = activeSession
+    ? openTimer
+      ? { text: formatElapsed(elapsed), expired: false }
+      : formatCountdown(remaining)
+    : null;
   const pending = Number(activeSession?.valorPendenteCentavos) || 0;
 
   return (
@@ -142,20 +148,20 @@ function ScanResult({ token, onScanAnother }) {
             <div>
               <span className="eyebrow">Sessão ativa</span>
               <h2>{clientName(activeSession.clienteNome)}</h2>
-              <p>{activeSession.planoNome} · {activeSession.minutosContratados} min · {brl(activeSession.valorCentavos)}</p>
+              <p>{activeSession.planoNome} · {openTimer ? 'Timer livre' : `${activeSession.minutosContratados} min`} · {brl(activeSession.valorCentavos)}</p>
             </div>
             <div className={`scan-timer ${countdown?.expired ? 'is-expired' : ''}`}>
               <strong>{countdown?.text}</strong>
-              <span>{countdown?.expired ? 'excedido' : 'restantes'}</span>
+              <span>{openTimer ? 'decorrido' : countdown?.expired ? 'excedido' : 'restantes'}</span>
             </div>
           </div>
           <div className="scan-session-meta">
             <span><Icon name="clock" size={15} /> Início {formatTime(activeSession.iniciadoEm)}</span>
-            <span><Icon name="timer" size={15} /> Fim {formatTime(activeSession.fimPrevistoEm)}</span>
+            <span><Icon name="timer" size={15} /> {openTimer ? 'Sem fim previsto' : `Fim ${formatTime(activeSession.fimPrevistoEm)}`}</span>
             <span><Icon name="cash" size={15} /> {activeSession.pago ? `Pago${activeSession.formaPagamento ? ` · ${paymentLabel(activeSession.formaPagamento)}` : ''}` : pending > 0 ? `Falta ${brl(pending)}` : 'Pago'}</span>
           </div>
           <div className="scan-session-actions">
-            <Button variant="secondary" icon="plus" onClick={() => setModal({ type: 'renew' })}>Renovar</Button>
+            {!openTimer && <Button variant="secondary" icon="plus" onClick={() => setModal({ type: 'renew' })}>Renovar</Button>}
             <Button variant="success" icon="stop" onClick={() => setModal({ type: 'end' })}>Encerrar</Button>
             {pending > 0 && (
               <Button variant="ghost" icon="cash" onClick={() => setModal({ type: 'pay' })}>Registrar pagamento</Button>

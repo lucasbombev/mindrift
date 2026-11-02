@@ -156,6 +156,8 @@ export function DashboardPage() {
 
   const availableCarts = data.carts.filter((cart) => cart.status === 'disponivel');
   const summary = data.summary;
+  const finiteActive = data.sessoesAtivas.filter((session) => session.fimPrevistoEm);
+  const nextEnd = finiteActive.sort((a, b) => new Date(a.fimPrevistoEm) - new Date(b.fimPrevistoEm))[0];
   const filteredCarts = data.carts.filter(
     (cart) =>
       (categoryFilter === 'all' || cart.categoryId === Number(categoryFilter)) &&
@@ -312,13 +314,11 @@ export function DashboardPage() {
               ? `${summary.emUso} aluguel(is) em andamento`
               : 'Nenhum aluguel em andamento agora'}
             {' · '}
-            {data.sessoesAtivas.length > 0
-              ? `próximo término às ${formatTime(
-                  [...data.sessoesAtivas].sort(
-                    (a, b) => new Date(a.fimPrevistoEm) - new Date(b.fimPrevistoEm),
-                  )[0]?.fimPrevistoEm,
-                )}`
-              : 'todos os carrinhos livres'}
+            {nextEnd
+              ? `próximo término às ${formatTime(nextEnd.fimPrevistoEm)}`
+              : data.sessoesAtivas.length > 0
+                ? 'timer livre em andamento'
+                : 'todos os carrinhos livres'}
           </p>
         </div>
         <div className="legend" aria-label="Legenda de status">

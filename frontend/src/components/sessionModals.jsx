@@ -69,7 +69,7 @@ export function pricingResult(plans, pricing) {
     minutes,
     cents,
     name: 'Avulso',
-    valid: Number.isInteger(minutes) && minutes >= 1 && minutes <= 1440 && Number.isFinite(cents) && cents >= 0,
+    valid: Number.isInteger(minutes) && minutes >= 0 && minutes <= 1440 && Number.isFinite(cents) && cents >= 0,
   };
 }
 
@@ -123,11 +123,11 @@ function PricingSelector({ plans, pricing, setPricing, disabled, loading }) {
       </div>
       {isCustom && (
         <div className="form-grid form-grid--2">
-          <Field label="Minutos" htmlFor="avulso-minutos">
+          <Field label="Minutos (0 = livre)" htmlFor="avulso-minutos">
             <Input
               id="avulso-minutos"
               type="number"
-              min="1"
+              min="0"
               max="1440"
               inputMode="numeric"
               value={pricing.minutos}
@@ -182,7 +182,7 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
   }, [cartId, plans.length, selectedCart?.categoryId]);
 
   const result = pricingResult(availablePlans, pricing);
-  const predictedEnd = new Date(Date.now() + result.minutes * 60_000);
+  const predictedEnd = result.minutes > 0 ? new Date(Date.now() + result.minutes * 60_000) : null;
 
   const handlePricing = (value) => {
     touched.current = true;
@@ -193,21 +193,22 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
     event.preventDefault();
     setError('');
     if (!cartId) return setError('Escolha um carrinho.');
-    if (!result.valid) return setError('Escolha um plano válido ou informe minutos e valor.');
+    if (!result.valid) return setError('Escolha um plano válido ou informe minutos (0 = livre) e valor.');
+    if (result.minutes === 0 && pagamentoAdiantado) return setError('Timer livre só pode ser pago no encerramento.');
     setLoading(true);
     try {
       const payload = {
         cart_id: Number(cartId),
         cliente_nome: cliente.trim() || null,
         observacao: observacao.trim() || undefined,
-        pagamento_adiantado: pagamentoAdiantado,
+        pagamento_adiantado: result.minutes === 0 ? false : pagamentoAdiantado,
         forma_pagamento: pagamentoAdiantado ? formaPagamento : null,
         ...pricingPayload(pricing, availablePlans),
       };
       const data = await api.post('/sessions', payload);
       toast(
         `Aluguel de ${clientName(data.sessao.clienteNome)} iniciado no ${data.sessao.cartCodigo}.${
-          pagamentoAdiantado ? ` Recebido adiantado: ${brl(data.sessao.valorAdiantadoCentavos)}.` : ' Pagamento no final.'
+          result.minutes === 0 ? ' Timer livre iniciado; cobre no encerramento.' : pagamentoAdiantado ? ` Recebido adiantado: ${brl(data.sessao.valorAdiantadoCentavos)}.` : ' Pagamento no final.'
         }`,
         { type: 'success', title: 'Timer rodando' },
       );
@@ -230,9 +231,11 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
       footer={
         <Button type="submit" form="form-start-session" size="lg" loading={loading} icon="play" block>
           {result.valid
-            ? pagamentoAdiantado
-              ? `Iniciar e receber · ${brl(result.cents)}`
-              : `Iniciar · ${brl(result.cents)}`
+            ? result.minutes === 0
+              ? 'Iniciar timer livre'
+              : pagamentoAdiantado
+                ? `Iniciar e receber · ${brl(result.cents)}`
+                : `Iniciar · ${brl(result.cents)}`
             : 'Iniciar aluguel'}
         </Button>
       }
@@ -283,19 +286,26 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
           />
         </div>
 
-        <Field label="Pagamento">
-          <Segmented
-            options={[
-              { value: 'final', label: 'No final', icon: 'clock' },
-              { value: 'adiantado', label: 'Pago adiantado', icon: 'cash' },
-            ]}
-            value={pagamentoAdiantado ? 'adiantado' : 'final'}
-            onChange={(value) => setPagamentoAdiantado(value === 'adiantado')}
-            ariaLabel="Momento do pagamento"
-          />
-        </Field>
+        {result.minutes === 0 ? (
+          <InfoNote icon="clock">
+            <strong>Timer livre:</strong> o tempo conta para cima e só para no botão
+            <strong> Encerrar</strong>. O valor é digitado no encerramento.
+          </InfoNote>
+        ) : (
+          <Field label="Pagamento">
+            <Segmented
+              options={[
+                { value: 'final', label: 'No final', icon: 'clock' },
+                { value: 'adiantado', label: 'Pago adiantado', icon: 'cash' },
+              ]}
+              value={pagamentoAdiantado ? 'adiantado' : 'final'}
+              onChange={(value) => setPagamentoAdiantado(value === 'adiantado')}
+              ariaLabel="Momento do pagamento"
+            />
+          </Field>
+        )}
 
-        {pagamentoAdiantado && (
+        {result.minutes > 0 && pagamentoAdiantado && (
           <>
             <Field label="Forma do pagamento adiantado">
               <Segmented
@@ -311,7 +321,7 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
             </InfoNote>
           </>
         )}
-        {!pagamentoAdiantado && (
+        {result.minutes > 0 && !pagamentoAdiantado && (
           <InfoNote icon="clock">
             O valor será cobrado no <strong>encerramento</strong>. Você também pode deixar pendente no
             histórico.
@@ -339,8 +349,8 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
               <strong>{brl(result.cents)}</strong>
             </div>
             <div>
-              <span>Término previsto</span>
-              <strong>~{formatTime(predictedEnd)}</strong>
+              <span>{predictedEnd ? 'Término previsto' : 'Tipo'}</span>
+              <strong>{predictedEnd ? `~${formatTime(predictedEnd)}` : 'Livre'}</strong>
             </div>
           </div>
         )}
@@ -368,13 +378,15 @@ export function RenewSessionModal({ open, onClose, session, offset = 0, onSucces
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availablePlans.length, session.cartCategoryId]);
 
+  const openTimer = !session.fimPrevistoEm;
   const result = pricingResult(availablePlans, pricing);
-  const base = Math.max(Date.now() + offset, new Date(session.fimPrevistoEm).getTime());
+  const base = openTimer ? Date.now() + offset : Math.max(Date.now() + offset, new Date(session.fimPrevistoEm).getTime());
   const predictedEnd = new Date(base + result.minutes * 60_000);
 
   const submit = async (event) => {
     event.preventDefault();
-    if (!result.valid) return setError('Escolha um plano válido ou informe minutos e valor.');
+    if (openTimer) return setError('Timer livre só pode ser encerrado, não renovado.');
+    if (!result.valid || result.minutes === 0) return setError('Escolha um plano com tempo maior que zero.');
     setLoading(true);
     setError('');
     try {
@@ -414,11 +426,11 @@ export function RenewSessionModal({ open, onClose, session, offset = 0, onSucces
           </div>
           <div>
             <span>Termina às</span>
-            <strong>{formatTime(session.fimPrevistoEm)}</strong>
+            <strong>{session.fimPrevistoEm ? formatTime(session.fimPrevistoEm) : 'Timer livre'}</strong>
           </div>
           <div>
             <span>Tempo total</span>
-            <strong>{session.minutosContratados} min</strong>
+            <strong>{session.minutosContratados === 0 ? 'Livre' : `${session.minutosContratados} min`}</strong>
           </div>
         </div>
         <div>
@@ -434,7 +446,7 @@ export function RenewSessionModal({ open, onClose, session, offset = 0, onSucces
             loading={plansLoading}
           />
         </div>
-        {result.valid && (
+        {!openTimer && result.valid && (
           <InfoNote icon="clock">
             Novo término previsto: <strong>{formatDateTime(predictedEnd)}</strong> · valor total{' '}
             <strong>{brl(session.valorCentavos + result.cents)}</strong>
@@ -452,12 +464,11 @@ export function RenewSessionModal({ open, onClose, session, offset = 0, onSucces
 }
 
 export function EndSessionModal({ open, onClose, session, offset = 0, onSuccess }) {
+  const openTimer = !session.fimPrevistoEm;
+  const [valorFinal, setValorFinal] = useState(Number(session.valorCentavos) || 0);
   const adiantado = Math.max(0, Number(session.valorAdiantadoCentavos) || 0);
-  const restante = Math.max(
-    0,
-    Number(session.valorPendenteCentavos ??
-      Math.max(0, Number(session.valorCentavos) - adiantado)),
-  );
+  const effectiveTotal = openTimer ? Number(valorFinal) || 0 : Number(session.valorCentavos) || 0;
+  const restante = Math.max(0, effectiveTotal - (openTimer ? 0 : adiantado));
   const jaPago = restante === 0;
   const [pago, setPago] = useState(!jaPago);
   const [forma, setForma] = useState(
@@ -470,7 +481,7 @@ export function EndSessionModal({ open, onClose, session, offset = 0, onSuccess 
 
   const now = Date.now() + offset;
   const elapsed = Math.max(0, Math.round((now - new Date(session.iniciadoEm).getTime()) / 1000));
-  const remaining = new Date(session.fimPrevistoEm).getTime() - now;
+  const remaining = openTimer ? null : new Date(session.fimPrevistoEm).getTime() - now;
 
   const submit = async () => {
     setError('');
@@ -482,6 +493,7 @@ export function EndSessionModal({ open, onClose, session, offset = 0, onSuccess 
         pago: receber,
         forma_pagamento: receber ? (jaPago ? formaFinal : forma) : null,
         cart_destino: destino,
+        valor_final_centavos: openTimer ? Number(valorFinal) || 0 : undefined,
       });
       let message;
       const destinationLabel = {
@@ -489,10 +501,12 @@ export function EndSessionModal({ open, onClose, session, offset = 0, onSuccess 
         carregando: 'foi para carregamento',
         manutencao: 'foi para manutenção',
       }[destino];
-      if (jaPago) {
+      if (openTimer && jaPago) {
+        message = 'Sessão de timer livre encerrada sem cobrança.';
+      } else if (jaPago) {
         message = `Sessão encerrada. O pagamento de ${brl(session.valorPagoCentavos)} já havia sido recebido adiantado.`;
       } else if (pago) {
-        message = `Restante de ${brl(restante)} recebido (${paymentLabel(forma)}). Total: ${brl(session.valorCentavos)}.`;
+        message = `Restante de ${brl(restante)} recebido (${paymentLabel(forma)}). Total: ${brl(effectiveTotal)}.`;
       } else {
         message = `Sessão encerrada com ${brl(restante)} pendente.`;
       }
@@ -517,7 +531,7 @@ export function EndSessionModal({ open, onClose, session, offset = 0, onSuccess 
       footer={
         <Button variant="success" size="lg" loading={loading} icon="check" onClick={submit} block>
           {jaPago
-            ? `Encerrar · já pago`
+            ? `Encerrar · sem cobrança`
             : pago
               ? `Encerrar e receber · ${brl(restante)}`
               : `Encerrar · deixar ${brl(restante)} pendente`}
@@ -533,21 +547,26 @@ export function EndSessionModal({ open, onClose, session, offset = 0, onSuccess 
           </div>
           <div>
             <span>Tempo contratado</span>
-            <strong>{session.minutosContratados} min</strong>
+            <strong>{openTimer ? 'Livre' : `${session.minutosContratados} min`}</strong>
           </div>
           <div>
             <span>Valor total</span>
-            <strong className="end-summary__value">{brl(session.valorCentavos)}</strong>
+            <strong className="end-summary__value">{brl(effectiveTotal)}</strong>
           </div>
         </div>
-        {remaining < 0 && (
+        {openTimer && (
+          <Field label="Valor a cobrar pelo tempo aberto" htmlFor="valor-final" hint="Digite o valor combinado. O tempo decorrido é mostrado acima.">
+            <MoneyInput id="valor-final" valueCents={valorFinal} onChangeCents={(cents) => setValorFinal(cents || 0)} disabled={loading} />
+          </Field>
+        )}
+        {!openTimer && remaining < 0 && (
           <InfoNote tone="warning" icon="alert">
             O tempo terminou há {formatDuration(Math.abs(remaining) / 1000)}. O valor cobrado é o
             contratado; ajuste manualmente no histórico, se necessário.
           </InfoNote>
         )}
 
-        {jaPago ? (
+        {jaPago && !openTimer ? (
           <InfoNote tone="success" icon="check">
             Já recebido adiantado: <strong>{brl(session.valorPagoCentavos)}</strong>
             {session.formaAdiantado ? ` em ${paymentLabel(session.formaAdiantado)}` : ''}. Não há
@@ -949,7 +968,7 @@ export function SessionDetailsModal({ open, onClose, sessionId }) {
             </div>
             <div>
               <span>Tempo contratado</span>
-              <strong>{session.minutosContratados} min</strong>
+              <strong>{session.minutosContratados === 0 ? 'Livre' : `${session.minutosContratados} min`}</strong>
             </div>
             <div>
               <span>Início</span>
@@ -957,7 +976,7 @@ export function SessionDetailsModal({ open, onClose, sessionId }) {
             </div>
             <div>
               <span>Término previsto</span>
-              <strong>{formatDateTime(session.fimPrevistoEm)}</strong>
+              <strong>{session.fimPrevistoEm ? formatDateTime(session.fimPrevistoEm) : 'Timer livre'}</strong>
             </div>
             <div>
               <span>Encerrada em</span>

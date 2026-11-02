@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Sobe o Drift Rent com um único comando:
+ * Sobe o Mindrift com um único comando:
  *   npm start
  *
  * - cria backend/.env (com segredos aleatórios) se necessário;
@@ -22,7 +22,7 @@ const ENV_FILE = path.join(BACKEND, '.env');
 const ENV_EXAMPLE = path.join(BACKEND, '.env.example');
 
 function log(message) {
-  console.log(`\x1b[38;5;208m[drift]\x1b[0m ${message}`);
+  console.log(`\x1b[38;5;208m[mindrift]\x1b[0m ${message}`);
 }
 
 function randomSecret() {
@@ -32,7 +32,7 @@ function randomSecret() {
 function ensureEnv() {
   if (!fs.existsSync(ENV_FILE)) {
     if (!fs.existsSync(ENV_EXAMPLE)) {
-      console.error('[drift] backend/.env.example não encontrado.');
+      console.error('[mindrift] backend/.env.example não encontrado.');
       process.exit(1);
     }
     let content = fs.readFileSync(ENV_EXAMPLE, 'utf8');
@@ -117,7 +117,7 @@ function ensureDependencies() {
     shell: process.platform === 'win32',
   });
   if (result.status !== 0) {
-    console.error('[drift] Falha ao instalar dependências.');
+    console.error('[mindrift] Falha ao instalar dependências.');
     process.exit(result.status || 1);
   }
 }
@@ -132,7 +132,7 @@ function buildFrontend() {
     env: { ...process.env, NODE_ENV: 'production' },
   });
   if (result.status !== 0) {
-    console.error('[drift] Falha no build do frontend.');
+    console.error('[mindrift] Falha no build do frontend.');
     process.exit(result.status || 1);
   }
 }
@@ -173,21 +173,21 @@ function launch() {
       return;
     }
     console.error(
-      `\n[drift] O servidor encerrou inesperadamente (código ${code ?? '?'}${signal ? `, sinal ${signal}` : ''}).`,
+      `\n[mindrift] O servidor encerrou inesperadamente (código ${code ?? '?'}${signal ? `, sinal ${signal}` : ''}).`,
     );
     const now = Date.now();
     restartTimes = restartTimes.filter((time) => now - time < 60_000);
     restartTimes.push(now);
     if (restartTimes.length > 8) {
-      console.error('[drift] Muitas falhas em sequência. Verifique o log e rode novamente.');
+      console.error('[mindrift] Muitas falhas em sequência. Verifique o log e rode novamente.');
       process.exit(1);
     }
-    console.error('[drift] Reiniciando em 1,5 s... Os dados e timers continuam no SQLite.');
+    console.error('[mindrift] Reiniciando em 1,5 s... Os dados e timers continuam no SQLite.');
     setTimeout(launch, 1500);
   });
 
   child.on('error', (err) => {
-    console.error('[drift] Erro ao iniciar o servidor:', err.message);
+    console.error('[mindrift] Erro ao iniciar o servidor:', err.message);
     if (!shuttingDown) setTimeout(launch, 1500);
   });
 }
@@ -195,7 +195,7 @@ function launch() {
 const forward = (signal) => {
   if (shuttingDown) return;
   shuttingDown = true;
-  console.log(`\n[drift] Encerrando (${signal})...`);
+  console.log(`\n[mindrift] Encerrando (${signal})...`);
   if (child && !child.killed) child.kill(signal);
   setTimeout(() => process.exit(0), 3500).unref();
 };

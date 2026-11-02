@@ -7,6 +7,7 @@ import { ForcedPasswordChange } from './components/ChangePassword.jsx';
 import { Button, LoadingScreen, PageHeader, Spinner } from './components/ui.jsx';
 import { Icon, Logo } from './components/Icons.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
+import { ActiveSessionsPage } from './pages/ActiveSessionsPage.jsx';
 import { HistoryPage } from './pages/HistoryPage.jsx';
 import { ReportsPage } from './pages/ReportsPage.jsx';
 import { CartsPage } from './pages/CartsPage.jsx';
@@ -16,6 +17,7 @@ import { CashPage } from './pages/CashPage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { ChangePasswordPage } from './pages/ChangePasswordPage.jsx';
 import { PwaUpdateBanner } from './components/PwaUpdateBanner.jsx';
+import { FooterCredit } from './components/FooterCredit.jsx';
 import { SuperadminPage } from './pages/SuperadminPage.jsx';
 import { CategoriesPage } from './pages/CategoriesPage.jsx';
 import { QrCodesPage } from './pages/QrCodesPage.jsx';
@@ -97,6 +99,8 @@ function AppRoutes() {
     <Routes>
       <Route element={<AppLayout />}>
         <Route index element={<DashboardPage />} />
+        <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="em-uso" element={<ActiveSessionsPage />} />
         <Route path="scan" element={<ScanPage />} />
         <Route path="scan/:qrToken" element={<ScanPage />} />
         <Route path="historico" element={<HistoryPage />} />
@@ -178,6 +182,7 @@ export default function App() {
     <>
       <AppRoutes />
       <PwaUpdateBanner />
+      <FooterCredit />
     </>
   );
 }

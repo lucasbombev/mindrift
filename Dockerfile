@@ -1,4 +1,4 @@
-# Drift Rent — imagem de produção local (LAN)
+# Mindrift — imagem de produção local (LAN)
 # Build multi-stage; o frontend é compilado e servido pelo próprio Express.
 FROM node:24-bookworm-slim AS builder
 

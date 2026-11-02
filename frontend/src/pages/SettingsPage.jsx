@@ -6,6 +6,7 @@ import { useSoundPrefs } from '../context/SoundContext.jsx';
 import { SOUND_OPTIONS } from '../lib/audio.js';
 import { notificationPermission, requestNotifications } from '../lib/pwa.js';
 import { InstallAppButton, InstallInstructionsModal } from '../components/InstallApp.jsx';
+import { PushSettings } from '../components/PushSettings.jsx';
 import { Badge, Button, Field, InlineError, Input, PageHeader, Spinner, Toggle } from '../components/ui.jsx';
 import { Icon } from '../components/Icons.jsx';
 
@@ -35,7 +36,7 @@ export function SettingsPage() {
         fetch('/api/health').then((res) => res.ok).catch(() => false),
       ]);
       setSettings(settingsData.settings);
-      setNome(settingsData.settings.nome_estabelecimento || 'Drift Rent');
+      setNome(settingsData.settings.nome_estabelecimento || 'Mindrift');
       setLead(Number(settingsData.settings.alert_lead_seconds) === 30 ? 30 : Number(settingsData.settings.alert_lead_seconds) === 0 ? 0 : 60);
       setSomFim(settingsData.settings.som_fim || 'alarme');
       setSomRepetir(settingsData.settings.som_repetir !== '0');
@@ -196,6 +197,7 @@ export function SettingsPage() {
             <p className="muted small">
               Volume, vibrar e escolha do som são preferências por usuário em <strong>Mais → Som e vibração</strong>.
             </p>
+            <PushSettings />
           </div>
         </section>
       </div>

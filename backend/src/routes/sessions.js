@@ -25,7 +25,7 @@ import { parseDateKey, rangeBounds } from '../utils/time.js';
 
 const pricingShape = {
   plano_id: z.coerce.number().int().positive().nullable().optional(),
-  minutos: z.coerce.number().int().min(1).max(1440).optional(),
+  minutos: z.coerce.number().int().min(0).max(1440).optional(),
   valor_centavos: z.coerce.number().int().min(0).max(1_000_000).optional(),
 };
 
@@ -43,6 +43,7 @@ const renewSchema = z.object(pricingShape);
 const endSchema = z.object({
   pago: z.boolean().optional().default(false),
   forma_pagamento: z.enum(PAYMENT_METHODS).nullable().optional(),
+  valor_final_centavos: z.coerce.number().int().min(0).max(1_000_000).optional(),
   cart_destino: z.enum(CART_DESTINATIONS).optional().default('disponivel'),
 });
 
@@ -117,7 +118,7 @@ export function createSessionsRouter(db) {
       .prepare(
         `${SESSION_SELECT}
          WHERE s.tenant_id = ? AND s.status = 'em_andamento' AND s.excluida_em IS NULL
-         ORDER BY s.fim_previsto_em ASC`,
+         ORDER BY s.fim_previsto_em IS NULL, s.fim_previsto_em ASC`,
       )
       .all(req.tenantId);
     res.json({
@@ -159,7 +160,7 @@ export function createSessionsRouter(db) {
   router.post('/', (req, res, next) => {
     try {
       const body = startSchema.parse(req.body);
-      if (!body.plano_id && (!body.minutos || body.valor_centavos === undefined)) {
+      if (!body.plano_id && (body.minutos === undefined || body.valor_centavos === undefined)) {
         throw badRequest('Escolha um plano ou informe minutos e valor avulso.');
       }
       const session = startSession(db, req.tenantId, body, req.user);
@@ -173,7 +174,7 @@ export function createSessionsRouter(db) {
   router.post('/:id/renew', (req, res, next) => {
     try {
       const body = renewSchema.parse(req.body);
-      if (!body.plano_id && (!body.minutos || body.valor_centavos === undefined)) {
+      if (!body.plano_id && (body.minutos === undefined || body.valor_centavos === undefined)) {
         throw badRequest('Escolha um plano ou informe minutos e valor avulso.');
       }
       const session = renewSession(db, req.tenantId, Number(req.params.id), body, req.user);

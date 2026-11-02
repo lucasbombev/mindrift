@@ -20,6 +20,7 @@ import { createCategoriesRouter } from './routes/categories.js';
 import { createScanRouter } from './routes/scan.js';
 import { createQrcodesRouter } from './routes/qrcodes.js';
 import { createPreferencesRouter } from './routes/preferences.js';
+import { createPushRouter } from './routes/push.js';
 import { createSessionsRouter } from './routes/sessions.js';
 import { createDashboardRouter } from './routes/dashboard.js';
 import { createReportsRouter } from './routes/reports.js';
@@ -86,7 +87,7 @@ export function createApp({ db }) {
   app.get('/api/health', (_req, res) => {
     res.json({
       ok: true,
-      nome: 'Drift Rent',
+      nome: 'Mindrift',
       versao: config.version,
       horarioServidor: new Date().toISOString(),
       uptimeSegundos: Math.round(process.uptime()),
@@ -113,7 +114,7 @@ export function createApp({ db }) {
     if (!fs.existsSync(config.caCertPath)) {
       return res.status(404).type('text/plain').send('Certificado local não gerado.');
     }
-    res.download(config.caCertPath, 'drift-rent-ca.crt');
+    res.download(config.caCertPath, 'mindrift-ca.crt');
   });
 
   app.use('/api/auth', createAuthRouter(db));
@@ -134,6 +135,7 @@ export function createApp({ db }) {
   app.use('/api/scan', createScanRouter(db));
   app.use('/api/qrcodes', createQrcodesRouter(db));
   app.use('/api/preferences', createPreferencesRouter(db));
+  app.use('/api/push', createPushRouter(db));
   app.use('/api/sessions', createSessionsRouter(db));
   app.use('/api/reports', createReportsRouter(db));
   app.use('/api/cash', createCashRouter(db));

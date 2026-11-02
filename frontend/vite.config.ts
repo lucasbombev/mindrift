@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'script',
       manifest: {
-        name: 'Carrinhos de Drift',
-        short_name: 'Drift',
+        name: 'Mindrift',
+        short_name: 'Mindrift',
         description:
           'Gestão de aluguel de carrinhos de drift: timer em tempo real, caixa e relatórios.',
         lang: 'pt-BR',
@@ -78,6 +78,7 @@ export default defineConfig({
         ],
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,woff2,wav}'],
         cleanupOutdatedCaches: true,
+        importScripts: ['push-sw.js'],
         runtimeCaching: [
           {
             // Timer, status, autenticação e qualquer dado do negócio SEMPRE vêm do
@@ -97,7 +98,7 @@ export default defineConfig({
               ['script', 'style', 'font', 'image'].includes(request.destination),
             handler: 'StaleWhileRevalidate',
             options: {
-              cacheName: 'drift-assets',
+              cacheName: 'mindrift-assets',
               expiration: {
                 maxEntries: 120,
                 maxAgeSeconds: 30 * 24 * 60 * 60,

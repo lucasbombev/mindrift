@@ -71,7 +71,7 @@ if (NEW_CA || !hasCA) {
     '-days',
     '3650',
     '-subj',
-    '/CN=Drift Rent CA',
+    '/CN=Mindrift CA',
   ]);
 } else {
   console.log('[cert] Reutilizando a CA local existente (a confiança dos celulares é preservada).');
@@ -88,7 +88,7 @@ sh('openssl', [
   '-out',
   path.join(CERT_DIR, 'server.csr'),
   '-subj',
-  '/CN=drift-rent.local',
+  '/CN=mindrift.local',
 ]);
 sh('openssl', [
   'x509',

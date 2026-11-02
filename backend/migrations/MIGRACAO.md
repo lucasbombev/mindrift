@@ -112,3 +112,20 @@ npm start
 
 Na primeira abertura após restaurar, o código v4 migra novamente o banco v3 e
 recria as estruturas. Para voltar também o código, use a versão anterior do app.
+
+## Migração 003 (v5) — timer livre e Web Push
+
+A versão 5:
+
+- reconstrói `sessions` para permitir `minutos_contratados = 0` e
+  `fim_previsto_em NULL`;
+- preserva todos os IDs, sessões e eventos;
+- cria `push_subscriptions`;
+- cria backup automático antes da reconstrução.
+
+Schema de referência: [`003_timer_livre_push.sql`](./003_timer_livre_push.sql).
+
+### Rollback v5
+
+Pare o servidor e restaure o backup `pre-migration-*.db` mais recente criado
+antes da v5. Para voltar também o comportamento do app, use a versão anterior.
