@@ -60,6 +60,27 @@ function ensureEnv() {
   }
 }
 
+async function ensureVapid() {
+  if (!fs.existsSync(ENV_FILE)) return;
+  let content = fs.readFileSync(ENV_FILE, 'utf8');
+  const publicMatch = content.match(/^VAPID_PUBLIC_KEY=(.*)$/m);
+  const privateMatch = content.match(/^VAPID_PRIVATE_KEY=(.*)$/m);
+  if (publicMatch?.[1]?.trim() && privateMatch?.[1]?.trim()) return;
+  try {
+    const webpush = (await import('web-push')).default;
+    const keys = webpush.generateVAPIDKeys();
+    if (publicMatch) content = content.replace(/^VAPID_PUBLIC_KEY=.*$/m, `VAPID_PUBLIC_KEY=${keys.publicKey}`);
+    else content += `\nVAPID_PUBLIC_KEY=${keys.publicKey}`;
+    if (privateMatch) content = content.replace(/^VAPID_PRIVATE_KEY=.*$/m, `VAPID_PRIVATE_KEY=${keys.privateKey}`);
+    else content += `\nVAPID_PRIVATE_KEY=${keys.privateKey}`;
+    if (!/^VAPID_SUBJECT=/m.test(content)) content += '\nVAPID_SUBJECT=mailto:contato@mindrift.local';
+    fs.writeFileSync(ENV_FILE, content, { mode: 0o600 });
+    log('Chaves VAPID geradas e salvas em backend/.env.');
+  } catch (err) {
+    console.error('[mindrift] Não foi possível gerar VAPID:', err.message);
+  }
+}
+
 function parseEnvFile(file) {
   if (!fs.existsSync(file)) return {};
   const env = {};
@@ -140,6 +161,7 @@ function buildFrontend() {
 
 ensureDependencies();
 ensureEnv();
+await ensureVapid();
 buildFrontend();
 
 const env = parseEnvFile(ENV_FILE);

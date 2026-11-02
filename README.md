@@ -360,6 +360,35 @@ apenas o indicador verde/vermelho **Sistema operacional**.
 - Se o usuário bloquear a permissão, o app mostra instruções para liberar nas configurações do
   navegador/PWA.
 
+### Se aparecer “Notificações push não estão configuradas no servidor”
+
+1. Confira as chaves no `backend/.env`:
+   ```bash
+   grep '^VAPID_' backend/.env
+   ```
+2. Se estiverem vazias, gere:
+   ```bash
+   npm run vapid:generate
+   ```
+   Para substituir chaves existentes (invalida inscrições antigas):
+   ```bash
+   npm run vapid:generate -- --force
+   ```
+3. Reinicie o servidor com `npm start`. No boot deve aparecer:
+   ```text
+   [push] VAPID configurado; Web Push habilitado.
+   ```
+4. Teste a rota autenticada:
+   ```bash
+   curl -H "Authorization: Bearer <token>" \
+     http://localhost:3000/api/push/public-key
+   ```
+   Ela deve retornar `{ "publicKey": "..." }` com HTTP 200.
+5. O backend também relê `backend/.env` em runtime se o processo tiver subido antes das
+   chaves. Ainda assim, reinicie após trocar as chaves.
+6. No Docker, o `docker-compose.yml` carrega `backend/.env` via `env_file`; as chaves
+   não precisam ficar no `.env` da raiz.
+
 ## 8. Perfis e permissões
 
 | Ação | Superadmin | Admin do tenant | Operador |

@@ -26,7 +26,7 @@ export function createPushRouter(db) {
 
   router.get('/public-key', (req, res, next) => {
     try {
-      if (!pushConfigured()) throw badRequest('Notificações push não estão configuradas no servidor.', 'push_indisponivel');
+      if (!pushConfigured()) throw badRequest('Notificações push não estão configuradas no servidor. Verifique VAPID no backend/.env e reinicie com npm run vapid:generate.', 'push_indisponivel');
       res.json({ publicKey: publicKey() });
     } catch (err) {
       next(err);
@@ -69,7 +69,7 @@ export function createPushRouter(db) {
 
   router.post('/subscribe', (req, res, next) => {
     try {
-      if (!pushConfigured()) throw badRequest('Notificações push não estão configuradas no servidor.', 'push_indisponivel');
+      if (!pushConfigured()) throw badRequest('Notificações push não estão configuradas no servidor. Verifique VAPID no backend/.env e reinicie com npm run vapid:generate.', 'push_indisponivel');
       const body = payloadSchema.parse(req.body);
       const sub = body.subscription;
       db.prepare(
@@ -101,7 +101,7 @@ export function createPushRouter(db) {
 
   router.post('/test', async (req, res, next) => {
     try {
-      if (!pushConfigured()) throw badRequest('Notificações push não estão configuradas no servidor.', 'push_indisponivel');
+      if (!pushConfigured()) throw badRequest('Notificações push não estão configuradas no servidor. Verifique VAPID no backend/.env e reinicie com npm run vapid:generate.', 'push_indisponivel');
       const result = await sendToUser(db, req.tenantId, req.user.id, {
         title: 'Notificação de teste',
         body: 'Se você está vendo isto, o Web Push do Mindrift está funcionando.',

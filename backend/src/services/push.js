@@ -1,16 +1,72 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import dotenv from 'dotenv';
 import webpush from 'web-push';
-import { config } from '../config.js';
+import { BACKEND_ROOT, config } from '../config.js';
 
 let configured = false;
-function configure() {
-  if (configured) return Boolean(config.vapidPublicKey && config.vapidPrivateKey);
-  configured = true;
-  if (!config.vapidPublicKey || !config.vapidPrivateKey) {
-    console.warn('[push] VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY ausentes; push desativado.');
+
+/**
+ * Relê as chaves do backend/.env se o processo tiver iniciado antes delas.
+ * Isso corrige o caso clássico de servidor aberto antes de configurar VAPID:
+ * a próxima chamada de /api/push/public-key passa a funcionar sem reiniciar.
+ */
+function reloadVapidFromDisk(force = false) {
+  const envPath = path.join(BACKEND_ROOT, '.env');
+  if (!fs.existsSync(envPath)) return false;
+  try {
+    const parsed = dotenv.parse(fs.readFileSync(envPath));
+    let changed = false;
+    if ((force || !config.vapidPublicKey) && parsed.VAPID_PUBLIC_KEY) {
+      config.vapidPublicKey = parsed.VAPID_PUBLIC_KEY.trim();
+      changed = true;
+    }
+    if ((force || !config.vapidPrivateKey) && parsed.VAPID_PRIVATE_KEY) {
+      config.vapidPrivateKey = parsed.VAPID_PRIVATE_KEY.trim();
+      changed = true;
+    }
+    if ((!config.vapidSubject || config.vapidSubject === 'mailto:contato@mindrift.local') && parsed.VAPID_SUBJECT) {
+      config.vapidSubject = parsed.VAPID_SUBJECT.trim();
+      changed = true;
+    }
+    if (changed) {
+      configured = false;
+      console.log('[push] Chaves VAPID recarregadas de backend/.env.');
+    }
+    return changed;
+  } catch (err) {
+    console.warn('[push] Falha ao reler backend/.env:', err.message);
     return false;
   }
-  webpush.setVapidDetails(config.vapidSubject, config.vapidPublicKey, config.vapidPrivateKey);
-  return true;
+}
+
+function configure() {
+  if (configured) return true;
+  if (!config.vapidPublicKey || !config.vapidPrivateKey) reloadVapidFromDisk();
+  if (!config.vapidPublicKey || !config.vapidPrivateKey) {
+    console.warn(
+      '[push] VAPID ausente: rode "npm run vapid:generate" e reinicie. Push desativado.',
+    );
+    return false;
+  }
+  try {
+    webpush.setVapidDetails(config.vapidSubject, config.vapidPublicKey, config.vapidPrivateKey);
+    configured = true;
+    console.log('[push] VAPID configurado; Web Push habilitado.');
+    return true;
+  } catch (err) {
+    console.error('[push] Chaves VAPID inválidas:', err.message);
+    reloadVapidFromDisk(true);
+    try {
+      webpush.setVapidDetails(config.vapidSubject, config.vapidPublicKey, config.vapidPrivateKey);
+      configured = true;
+      console.log('[push] VAPID recarregado do .env e habilitado.');
+      return true;
+    } catch (secondErr) {
+      console.error('[push] VAPID continua inválido; rode "npm run vapid:generate -- --force".', secondErr.message);
+      return false;
+    }
+  }
 }
 
 export function pushConfigured() {

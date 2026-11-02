@@ -11,7 +11,7 @@ import { authenticateToken } from './middleware/auth.js';
 import { getDashboard } from './services/dashboard.js';
 import { getLanUrls } from './services/system.js';
 import { installFileLogger } from './utils/logger.js';
-import { sendToTenant } from './services/push.js';
+import { pushConfigured, sendToTenant } from './services/push.js';
 import {
   startBackupScheduler,
   startupBackupIfNeeded,
@@ -205,6 +205,7 @@ const port = config.port;
 httpServer.listen(port, config.host, () => {
   const urls = getLanUrls(port);
   console.log('');
+  pushConfigured();
   console.log('  🏁 Mindrift — servidor no ar');
   console.log(`  Local:   http://localhost:${port}`);
   for (const url of urls) console.log(`  Rede:    ${url}`);

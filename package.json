@@ -14,7 +14,8 @@
     "seed": "npm run seed --workspace backend",
     "test": "npm test --workspace backend",
     "backup": "npm run backup --workspace backend",
-    "cert": "node scripts/generate-cert.mjs"
+    "cert": "node scripts/generate-cert.mjs",
+    "vapid:generate": "node scripts/generate-vapid.mjs"
   },
   "engines": {
     "node": ">=22.12.0"
