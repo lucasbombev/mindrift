@@ -44,13 +44,13 @@ function printGlobalPoster(qrDataUrl, publicUrl, tenantName, openedWindow = null
   .url { margin-top: 6mm; font-size: 11px; color: #64748b; word-break: break-all; }
 </style></head><body>
 <div class="page">
-  <div class="brand">Mindrift</div>
+  <div class="brand">Leao Brinquedos</div>
   <h1>Acompanhe o tempo<br>do seu filho!</h1>
   <p>Aponte a câmera do celular para o QR Code e consulte o tempo restante sem precisar chamar o operador.</p>
   <div class="qr"><img src="${qrDataUrl}" alt="QR Code de acompanhamento"></div>
   <div class="hint">Aponte a câmera do celular.</div>
   <div class="url">${escapeHtml(publicUrl)}</div>
-  <p style="margin-top:auto;font-size:12px">${escapeHtml(tenantName)} · Mindrift</p>
+  <p style="margin-top:auto;font-size:12px">${escapeHtml(tenantName)} · Leao Brinquedos · gestão de brinquedos</p>
 </div>
 </body></html>`);
   win.document.close();
@@ -221,7 +221,7 @@ export function QrCodesPage() {
       ) : error ? (
         <div className="error-panel error-panel--inline"><p>{error}</p><Button size="sm" icon="refresh" onClick={load}>Tentar novamente</Button></div>
       ) : carts.length === 0 ? (
-        <EmptyState icon="qr" title="Sem carrinhos para etiquetar" text="Cadastre carrinhos primeiro." />
+        <EmptyState icon="qr" title="Sem brinquedos para etiquetar" text="Cadastre brinquedos primeiro." />
       ) : (
         <div className="qr-groups">
           {grouped.map((group) => (
@@ -234,7 +234,7 @@ export function QrCodesPage() {
                 {group.items.map((cart) => (
                   <article key={cart.id} className="qr-card" style={{ '--category-color': cart.category?.cor }}>
                     <div className="qr-card__label">
-                      <img src={qrs[cart.id]} alt={`QR do carrinho ${cart.codigo}`} />
+                      <img src={qrs[cart.id]} alt={`QR do brinquedo ${cart.codigo}`} />
                       <strong>{cart.codigo}</strong>
                       <span>{cart.category?.icone} {cart.category?.nome}</span>
                       <small>{user?.tenantName}</small>

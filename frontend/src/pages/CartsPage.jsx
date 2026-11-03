@@ -84,8 +84,8 @@ function CartFormModal({ cart, categories, onClose, onSaved }) {
   const submit = async (event) => {
     event.preventDefault();
     setError('');
-    if (!codigo.trim()) return setError('Informe o código do carrinho.');
-    if (!categoryId) return setError('Escolha a categoria do carrinho.');
+    if (!codigo.trim()) return setError('Informe o código do brinquedo.');
+    if (!categoryId) return setError('Escolha a categoria do brinquedo.');
     setLoading(true);
     try {
       const formData = new FormData();
@@ -99,7 +99,7 @@ function CartFormModal({ cart, categories, onClose, onSaved }) {
       const data = isEdit
         ? await api.patch(`/carts/${cart.id}`, formData)
         : await api.post('/carts', formData);
-      toast(isEdit ? 'Carrinho atualizado.' : 'Carrinho cadastrado.', { type: 'success' });
+      toast(isEdit ? 'Brinquedo atualizado.' : 'Brinquedo cadastrado.', { type: 'success' });
       onSaved?.(data.item);
     } catch (err) {
       setError(err.message);
@@ -112,13 +112,13 @@ function CartFormModal({ cart, categories, onClose, onSaved }) {
     <Modal
       open
       onClose={onClose}
-      title={isEdit ? `Editar ${cart.codigo}` : 'Novo carrinho'}
+      title={isEdit ? `Editar brinquedo ${cart.codigo}` : 'Novo brinquedo'}
       subtitle="Código único, status e foto."
       icon="cart"
       dismissible={!loading}
       footer={
         <Button type="submit" form="cart-form" size="lg" loading={loading} icon="check" block>
-          {isEdit ? 'Salvar alterações' : 'Cadastrar carrinho'}
+          {isEdit ? 'Salvar alterações' : 'Cadastrar brinquedo'}
         </Button>
       }
     >
@@ -128,7 +128,7 @@ function CartFormModal({ cart, categories, onClose, onSaved }) {
         <div className="photo-field">
           <div className="photo-field__preview">
             {preview ? (
-              <img src={preview} alt="Prévia do carrinho" />
+              <img src={preview} alt="Prévia do brinquedo" />
             ) : (
               <div className="photo-field__empty">
                 <Icon name="camera" size={30} />
@@ -203,7 +203,7 @@ function CartFormModal({ cart, categories, onClose, onSaved }) {
         <Field
           label="Capacidade máxima"
           htmlFor="cart-capacidade"
-          hint="Use 1 para carrinhos de drift. Use 10, por exemplo, para pula-pula/infláveis."
+          hint="Use 1 para brinquedos de drift. Use 10, por exemplo, para pula-pula/infláveis."
           required
         >
           <Input
@@ -328,12 +328,12 @@ export function CartsPage() {
   return (
     <div className="container">
       <PageHeader
-        title="Carrinhos"
+        title="Brinquedos"
         subtitle={`${summary.total} cadastrado(s) · ${summary.available} disponível(is) · ${summary.inUse} em uso`}
         eyebrow="Administração"
         actions={
           <Button icon="plus" onClick={() => setCreateOpen(true)}>
-            Novo carrinho
+            Novo brinquedo
           </Button>
         }
       />
@@ -352,11 +352,11 @@ export function CartsPage() {
       ) : carts.length === 0 ? (
         <EmptyState
           icon="cart"
-          title="Cadastre o primeiro carrinho"
+          title="Cadastre o primeiro brinquedo"
           text="Adicione código, foto e status para começar a alugar."
           action={
             <Button icon="plus" onClick={() => setCreateOpen(true)}>
-              Novo carrinho
+              Novo brinquedo
             </Button>
           }
         />
@@ -368,7 +368,7 @@ export function CartsPage() {
               <article key={cart.id} className={`admin-cart admin-cart--${cart.status}`}>
                 <div className="admin-cart__media">
                   {cart.fotoUrl ? (
-                    <img src={cart.fotoUrl} alt={`Carrinho ${cart.codigo}`} loading="lazy" />
+                    <img src={cart.fotoUrl} alt={`Brinquedo ${cart.codigo}`} loading="lazy" />
                   ) : (
                     <CartArt code={cart.codigo} />
                   )}
@@ -472,13 +472,13 @@ export function CartsPage() {
         open={Boolean(deleting)}
         onClose={() => setDeleting(null)}
         onConfirm={handleDelete}
-        title={`Excluir ${deleting?.codigo || 'carrinho'}?`}
+        title={`Excluir ${deleting?.codigo || 'brinquedo'}?`}
         message={
           deleting?.sessaoAtiva
-            ? 'Este carrinho tem uma sessão ativa. Encerre ou cancele antes de excluir.'
-            : 'O carrinho sai do painel, mas o histórico de sessões continua preservado. O código poderá ser reutilizado.'
+            ? 'Este brinquedo tem uma sessão ativa. Encerre ou cancele antes de excluir.'
+            : 'O brinquedo sai do painel, mas o histórico de sessões continua preservado. O código poderá ser reutilizado.'
         }
-        confirmLabel="Excluir carrinho"
+        confirmLabel="Excluir brinquedo"
         loading={deleteLoading}
       />
 

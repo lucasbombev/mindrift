@@ -74,9 +74,9 @@ function NotFoundPage() {
 function BootSplash() {
   return (
     <div className="boot-splash">
-      <Logo size={58} />
+      <Logo size={58} withWordmark />
       <Spinner size={26} />
-      <p>Conectando ao painel da pista…</p>
+      <p>Conectando ao painel…</p>
     </div>
   );
 }

@@ -38,7 +38,7 @@ export function serializeCart(row, activeCount = 0) {
 export function getDashboard(db, tenantId) {
   const now = new Date();
   const { start, end } = dayBounds();
-  const nomeEstabelecimento = getSetting(db, tenantId, 'nome_estabelecimento', 'Mindrift');
+  const nomeEstabelecimento = getSetting(db, tenantId, 'nome_estabelecimento', 'Leao Brinquedos');
   const alertLeadSeconds = Number(getSetting(db, tenantId, 'alert_lead_seconds', '60')) || 0;
   const somFim = getSetting(db, tenantId, 'som_fim', 'alarme');
   const somRepetir = getSetting(db, tenantId, 'som_repetir', '1') === '1';

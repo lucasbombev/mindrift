@@ -144,7 +144,7 @@ export function PushSettings({ compact = false }) {
           )}
           {permission === 'denied' && (
             <InfoNote tone="warning" icon="alert">
-              A permissão está bloqueada. No Chrome, toque no cadeado ao lado da URL → Notificações → Permitir. No Safari/iPhone, use Ajustes do iPhone → Notificações → Mindrift (com o PWA instalado na Tela de Início).
+              A permissão está bloqueada. No Chrome, toque no cadeado ao lado da URL → Notificações → Permitir. No Safari/iPhone, use Ajustes do iPhone → Notificações → Leao Brinquedos (com o PWA instalado na Tela de Início).
             </InfoNote>
           )}
           <p className="muted small">

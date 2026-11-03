@@ -25,7 +25,7 @@ function reloadVapidFromDisk(force = false) {
       config.vapidPrivateKey = parsed.VAPID_PRIVATE_KEY.trim();
       changed = true;
     }
-    if ((!config.vapidSubject || config.vapidSubject === 'mailto:contato@mindrift.local') && parsed.VAPID_SUBJECT) {
+    if ((!config.vapidSubject || config.vapidSubject === 'mailto:contato@leaobrinquedos.local') && parsed.VAPID_SUBJECT) {
       config.vapidSubject = parsed.VAPID_SUBJECT.trim();
       changed = true;
     }

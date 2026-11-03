@@ -193,7 +193,7 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
   const submit = async (event) => {
     event.preventDefault();
     setError('');
-    if (!cartId) return setError('Escolha um carrinho.');
+    if (!cartId) return setError('Escolha um brinquedo.');
     if (collective && !cliente.trim()) return setError('Informe o nome da criança.');
     if (!result.valid) return setError('Escolha um plano válido ou informe minutos (0 = livre) e valor.');
     if (result.minutes === 0 && pagamentoAdiantado) return setError('Timer livre só pode ser pago no encerramento.');
@@ -245,9 +245,9 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
       <form id="form-start-session" onSubmit={submit} className="stack">
         <InlineError>{error || plansError}</InlineError>
 
-        <Field label="Carrinho" required>
+        <Field label="Brinquedo" required>
           <div className="cart-picker">
-            {carts.length === 0 && <p className="muted">Nenhum carrinho disponível.</p>}
+            {carts.length === 0 && <p className="muted">Nenhum brinquedo disponível.</p>}
             {carts.map((cart) => (
               <button
                 key={cart.id}
@@ -518,7 +518,7 @@ export function EndSessionModal({ open, onClose, session, offset = 0, onSuccess 
       } else {
         message = `Sessão encerrada com ${brl(restante)} pendente.`;
       }
-      message += ` Carrinho ${destinationLabel}.`;
+      message += ` Brinquedo ${destinationLabel}.`;
       toast(message, { type: 'success', title: 'Aluguel encerrado' });
       onSuccess?.(data.sessao);
     } catch (err) {
@@ -621,7 +621,7 @@ export function EndSessionModal({ open, onClose, session, offset = 0, onSuccess 
         )}
 
         <div className="destination-block">
-          <span className="field__label">Destino do carrinho</span>
+          <span className="field__label">Destino do brinquedo</span>
           <p className="muted small">Escolha em 1 toque o que acontece com o equipamento.</p>
           <div className="destination-grid">
             <button type="button" className={`destination-btn ${destino === 'disponivel' ? 'is-selected' : ''}`} onClick={() => setDestino('disponivel')} disabled={loading}>

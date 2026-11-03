@@ -39,7 +39,7 @@ export function createScanRouter(db) {
            WHERE c.tenant_id = ? AND c.codigo = ? COLLATE NOCASE AND c.excluido_em IS NULL`,
         )
         .get(req.tenantId, String(req.params.codigo).trim());
-      if (!cart) throw notFound('Carrinho não encontrado neste negócio.');
+      if (!cart) throw notFound('Brinquedo não encontrado neste negócio.');
       res.json(scanResponse(db, req.tenantId, cart));
     } catch (err) {
       next(err);

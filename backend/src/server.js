@@ -235,7 +235,7 @@ httpServer.listen(port, config.host, () => {
   console.log('');
   pushConfigured();
   console.log('[timer] verificação de timers/Web Push ativa a cada 1s (independente do frontend).');
-  console.log('  🏁 Mindrift — servidor no ar');
+  console.log('  🏁 Leao Brinquedos — servidor no ar');
   console.log(`  Local:   http://localhost:${port}`);
   for (const url of urls) console.log(`  Rede:    ${url}`);
   if (urls.length === 0) {

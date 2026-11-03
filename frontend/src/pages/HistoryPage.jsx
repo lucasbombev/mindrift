@@ -164,7 +164,7 @@ export function HistoryPage() {
     <div className="container">
       <PageHeader
         title="Histórico de sessões"
-        subtitle="Filtre por período, carrinho, cliente e pagamento."
+        subtitle="Filtre por período, brinquedo, cliente e pagamento."
         eyebrow={isAdmin ? 'Administração' : 'Operação'}
       />
 
@@ -237,9 +237,9 @@ export function HistoryPage() {
                 onChange={(event) => setForm({ ...form, cliente: event.target.value })}
               />
             </Field>
-            <Field label="Carrinho" htmlFor="filtro-carrinho">
+            <Field label="Brinquedo" htmlFor="filtro-brinquedo">
               <Select
-                id="filtro-carrinho"
+                id="filtro-brinquedo"
                 value={form.cartId}
                 onChange={(event) => setForm({ ...form, cartId: event.target.value })}
               >
@@ -367,7 +367,7 @@ export function HistoryPage() {
                 <div className="session-row__main">
                   <div className="session-row__cart">
                     <span className="session-row__cart-code">{session.cartCodigo}</span>
-                    <span className="session-row__cart-label">carrinho</span>
+                    <span className="session-row__cart-label">brinquedo</span>
                   </div>
                   <div className="session-row__client">
                     <strong>{clientName(session.clienteNome)}</strong>

@@ -89,7 +89,7 @@ export function createSessionsRouter(db) {
       }
       if (req.query.cartId) {
         const id = Number(req.query.cartId);
-        if (!Number.isInteger(id) || id <= 0) throw badRequest('Carrinho inválido.');
+        if (!Number.isInteger(id) || id <= 0) throw badRequest('Brinquedo inválido.');
         filters.cartId = id;
       }
       if (req.query.operadorId) filters.operadorId = Number(req.query.operadorId);

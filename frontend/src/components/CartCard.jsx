@@ -106,7 +106,7 @@ export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd,
         {cart.fotoUrl ? (
           <img
             src={cart.fotoUrl}
-            alt={`Carrinho ${cart.codigo}`}
+            alt={`Brinquedo ${cart.codigo}`}
             className="cart-card__photo"
             loading="lazy"
           />
@@ -293,14 +293,14 @@ export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd,
                 <strong>{statusLabel(cart.status)}</strong>
                 <p>
                   {cart.status === 'carregando'
-                    ? 'Carrinho na carga. Libere quando estiver pronto.'
+                    ? 'Brinquedo na carga. Libere quando estiver pronto.'
                     : 'Em manutenção. Altere o status no cadastro quando liberar.'}
                 </p>
               </div>
             </div>
             {isAdmin && (
               <Link className="cart-card__manage" to="/carrinhos">
-                Gerenciar carrinho
+                Gerenciar brinquedo
                 <Icon name="chevronRight" size={16} />
               </Link>
             )}

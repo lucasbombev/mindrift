@@ -266,7 +266,7 @@ export function UsersPage() {
           </Button>
         </div>
       ) : users.length === 0 ? (
-        <EmptyState icon="users" title="Nenhum usuário" text="Crie o primeiro operador da pista." />
+        <EmptyState icon="users" title="Nenhum usuário" text="Crie o primeiro operador." />
       ) : (
         <div className="users-list">
           {users.map((user) => {

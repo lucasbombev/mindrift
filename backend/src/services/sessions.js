@@ -94,7 +94,7 @@ function resolvePricing(db, tenantId, input, categoryId) {
       .get(input.plano_id, tenantId);
     if (!plan) throw badRequest('Plano inválido ou inativo.');
     if (plan.category_id && plan.category_id !== categoryId) {
-      throw badRequest('Este plano não é válido para a categoria deste carrinho.');
+      throw badRequest('Este plano não é válido para a categoria deste brinquedo.');
     }
     return {
       planoId: plan.id,
@@ -131,8 +131,8 @@ export function startSession(db, tenantId, input, operator) {
          WHERE c.id = ? AND c.tenant_id = ? AND c.excluido_em IS NULL`,
       )
       .get(input.cart_id, tenantId);
-    if (!cart) throw notFound('Carrinho não encontrado.');
-    if (!cart.category_ativa) throw badRequest('A categoria deste carrinho está inativa.');
+    if (!cart) throw notFound('Brinquedo não encontrado.');
+    if (!cart.category_ativa) throw badRequest('A categoria deste brinquedo está inativa.');
     const capacity = cartCapacity(cart);
     const activeCount = db
       .prepare(
@@ -143,13 +143,13 @@ export function startSession(db, tenantId, input, operator) {
       .get(tenantId, cart.id).n;
     if (cart.status === 'carregando' || cart.status === 'manutencao') {
       throw conflict(
-        'Carrinho indisponível. Altere o status para "disponível" antes de iniciar.',
+        'Brinquedo indisponível. Altere o status para "disponível" antes de iniciar.',
         'carrinho_indisponivel',
       );
     }
     if (activeCount >= capacity) {
       if (capacity === 1) {
-        throw conflict('Este carrinho já está em uso.', 'carrinho_indisponivel');
+        throw conflict('Este brinquedo já está em uso.', 'carrinho_indisponivel');
       }
       throw conflict(
         'Equipamento lotado. Aguarde uma saída para adicionar outra criança.',
@@ -213,7 +213,7 @@ export function startSession(db, tenantId, input, operator) {
     }
 
     logEvent(db, tenantId, sessionId, 'inicio', operator.id, {
-      carrinho: cart.codigo,
+      brinquedo: cart.codigo,
       cliente,
       plano: pricing.planoNome,
       minutos: pricing.minutos,
@@ -403,7 +403,7 @@ export function endSession(db, tenantId, id, input, operator) {
       valorRestanteCentavos: restante,
       pago: Boolean(nextPago),
       formaPagamento: nextForma,
-      destinoCarrinho: remaining > 0 ? 'em_uso' : cartDestino,
+      destinoBrinquedo: remaining > 0 ? 'em_uso' : cartDestino,
     });
     if (hasFinalPayment) {
       logEvent(db, tenantId, id, 'pagamento', operator.id, {

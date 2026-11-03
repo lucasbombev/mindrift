@@ -118,7 +118,7 @@ export function createCategoriesRouter(db) {
         return res.json({
           ok: true,
           desativado: true,
-          mensagem: 'Categoria possui carrinhos ou planos e foi desativada.',
+          mensagem: 'Categoria possui brinquedos ou planos e foi desativada.',
         });
       }
       db.prepare('DELETE FROM categories WHERE id = ? AND tenant_id = ?').run(id, req.tenantId);

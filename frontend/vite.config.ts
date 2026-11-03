@@ -9,10 +9,10 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'script',
       manifest: {
-        name: 'Mindrift',
-        short_name: 'Mindrift',
+        name: 'Leao Brinquedos',
+        short_name: 'Leao Brinquedos',
         description:
-          'Gestão de aluguel de carrinhos de drift: timer em tempo real, caixa e relatórios.',
+          'Gestão de brinquedos: timer em tempo real, caixa e relatórios.',
         lang: 'pt-BR',
         dir: 'ltr',
         start_url: '/',
@@ -53,10 +53,10 @@ export default defineConfig({
         ],
         shortcuts: [
           {
-            name: 'Painel da pista',
+            name: 'Painel de brinquedos',
             short_name: 'Painel',
             url: '/',
-            description: 'Ver carrinhos e aluguéis em andamento',
+            description: 'Ver brinquedos e aluguéis em andamento',
           },
           {
             name: 'Histórico',
@@ -98,7 +98,7 @@ export default defineConfig({
               ['script', 'style', 'font', 'image'].includes(request.destination),
             handler: 'StaleWhileRevalidate',
             options: {
-              cacheName: 'mindrift-assets',
+              cacheName: 'leaobrinquedos-assets',
               expiration: {
                 maxEntries: 120,
                 maxAgeSeconds: 30 * 24 * 60 * 60,

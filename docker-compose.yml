@@ -18,7 +18,7 @@ services:
       DB_PATH: data/drift.db
       UPLOAD_DIR: uploads
       BACKUP_DIR: backups
-      LOG_PATH: logs/mindrift.log
+      LOG_PATH: logs/leaobrinquedos.log
       ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-12h}
       REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL:-30d}
       BACKUP_HOUR: ${BACKUP_HOUR:-3}

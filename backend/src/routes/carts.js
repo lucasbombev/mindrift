@@ -15,7 +15,7 @@ const STATUSES = ['disponivel', 'carregando', 'manutencao'];
 const codigoSchema = z
   .string()
   .trim()
-  .min(1, 'Informe o código do carrinho.')
+  .min(1, 'Informe o código do brinquedo.')
   .max(12, 'O código deve ter no máximo 12 caracteres.')
   .regex(/^[a-zA-Z0-9_-]+$/, 'Use apenas letras, números, hífen ou sublinhado.')
   .transform((value) => value.toUpperCase());
@@ -120,7 +120,7 @@ export function createCartsRouter(db) {
         )
         .get(req.tenantId, body.codigo);
       if (exists) {
-        throw conflict('Já existe um carrinho com este código.');
+        throw conflict('Já existe um brinquedo com este código.');
       }
       const now = nowIso();
       const info = db
@@ -154,13 +154,13 @@ export function createCartsRouter(db) {
     try {
       const id = Number(req.params.id);
       const row = getCart(db, req.tenantId, id);
-      if (!row) throw notFound('Carrinho não encontrado.');
+      if (!row) throw notFound('Brinquedo não encontrado.');
       validateUploadedPhoto(req.file);
       const body = updateSchema.parse(req.body);
       const activeCount = activeSessionCountForCart(db, req.tenantId, id);
 
       if (body.status && body.status !== row.status && activeCount > 0) {
-        throw conflict('Não altere o status de um carrinho com sessão em andamento.');
+        throw conflict('Não altere o status de um brinquedo com sessão em andamento.');
       }
       if (body.codigo && body.codigo !== row.codigo) {
         const exists = db
@@ -169,7 +169,7 @@ export function createCartsRouter(db) {
                AND excluido_em IS NULL AND id != ?`,
           )
           .get(req.tenantId, body.codigo, id);
-        if (exists) throw conflict('Já existe um carrinho com este código.');
+        if (exists) throw conflict('Já existe um brinquedo com este código.');
       }
       if (body.category_id !== undefined) {
         const category = requireCategory(db, req.tenantId, body.category_id);
@@ -178,7 +178,7 @@ export function createCartsRouter(db) {
           throw badRequest('Escolha uma categoria ativa.');
         }
         if (activeCount > 0 && changedCategory) {
-          throw conflict('Não altere a categoria de um carrinho com sessão em andamento.');
+          throw conflict('Não altere a categoria de um brinquedo com sessão em andamento.');
         }
       }
 
@@ -238,24 +238,24 @@ export function createCartsRouter(db) {
     }
   });
 
-  // Check-in rápido pelo scan: devolve o carrinho à operação.
+  // Check-in rápido pelo scan: devolve o brinquedo à operação.
   router.post('/:id/checkin', (req, res, next) => {
     try {
       const id = Number(req.params.id);
       const row = getCart(db, req.tenantId, id);
-      if (!row) throw notFound('Carrinho não encontrado.');
+      if (!row) throw notFound('Brinquedo não encontrado.');
       if (activeSessionCountForCart(db, req.tenantId, id) > 0) {
         throw conflict('Encerre as sessões ativas antes de fazer check-in.');
       }
       const body = checkinSchema.parse(req.body || {});
       if (row.status === 'manutencao' && req.user.role !== 'admin') {
-        throw forbidden('Apenas administradores liberam carrinho da manutenção.');
+        throw forbidden('Apenas administradores liberam brinquedo da manutenção.');
       }
       if (row.status === 'em_uso') {
-        throw conflict('Carrinho está em uso. Encerre as sessões ativas primeiro.');
+        throw conflict('Brinquedo está em uso. Encerre as sessões ativas primeiro.');
       }
       if (row.status === 'disponivel') {
-        return res.json({ item: serializeCart(row), mensagem: 'Carrinho já está disponível.' });
+        return res.json({ item: serializeCart(row), mensagem: 'Brinquedo já está disponível.' });
       }
       const observacao =
         body.observacao !== undefined && body.observacao !== null && body.observacao !== ''
@@ -277,7 +277,7 @@ export function createCartsRouter(db) {
     try {
       const id = Number(req.params.id);
       const row = getCart(db, req.tenantId, id);
-      if (!row) throw notFound('Carrinho não encontrado.');
+      if (!row) throw notFound('Brinquedo não encontrado.');
       res.json({ items: listCartStatusEvents(db, req.tenantId, id) });
     } catch (err) {
       next(err);
@@ -288,7 +288,7 @@ export function createCartsRouter(db) {
     try {
       const id = Number(req.params.id);
       const row = getCart(db, req.tenantId, id);
-      if (!row) throw notFound('Carrinho não encontrado.');
+      if (!row) throw notFound('Brinquedo não encontrado.');
       const activeCount = activeSessionCountForCart(db, req.tenantId, id);
       if (activeCount > 0 || row.status === 'em_uso') {
         const singular = activeCount === 1 && (Number(row.capacidade_maxima) || 1) === 1;
@@ -340,9 +340,9 @@ export function createCartsRouter(db) {
     try {
       const id = Number(req.params.id);
       const row = getCart(db, req.tenantId, id);
-      if (!row) throw notFound('Carrinho não encontrado.');
+      if (!row) throw notFound('Brinquedo não encontrado.');
       if (activeSessionCountForCart(db, req.tenantId, id) > 0) {
-        throw conflict('Encerre ou cancele as sessões ativas antes de excluir o carrinho.');
+        throw conflict('Encerre ou cancele as sessões ativas antes de excluir o brinquedo.');
       }
       const now = nowIso();
       db.prepare(

@@ -215,7 +215,7 @@ export function DashboardPage() {
           <span className="dashboard-hero__eyebrow">
             {greeting()}, {String(user?.nome || '').split(' ')[0]}
           </span>
-          <h1>{data.nomeEstabelecimento || 'Painel da pista'}</h1>
+          <h1>{data.nomeEstabelecimento || 'Painel de brinquedos'}</h1>
           <p className="dashboard-hero__date">{todayLong()} · timer ao vivo</p>
         </div>
         <div className="dashboard-hero__actions">
@@ -288,7 +288,7 @@ export function DashboardPage() {
 
       <div className="stats-grid">
         <StatCard
-          label="Carrinhos"
+          label="Brinquedos"
           value={summary.totalCarrinhos}
           hint={`${summary.disponiveis} disponíveis · ${summary.carregando} na carga`}
           tone="neutral"
@@ -353,7 +353,7 @@ export function DashboardPage() {
 
       <div className="section-head">
         <div>
-          <h2>Pista ao vivo</h2>
+          <h2>Brinquedos ao vivo</h2>
           <p>
             {summary.emUso > 0
               ? `${summary.emUso} aluguel(is) em andamento`
@@ -363,7 +363,7 @@ export function DashboardPage() {
               ? `próximo término às ${formatTime(nextEnd.fimPrevistoEm)}`
               : data.sessoesAtivas.length > 0
                 ? 'timer livre em andamento'
-                : 'todos os carrinhos livres'}
+                : 'todos os brinquedos livres'}
           </p>
         </div>
         <div className="legend" aria-label="Legenda de status">
@@ -383,23 +383,23 @@ export function DashboardPage() {
       {data.carts.length === 0 ? (
         <EmptyState
           icon="cart"
-          title="Nenhum carrinho cadastrado"
-          text="Cadastre os carrinhos para começar a controlar os aluguéis."
+          title="Nenhum brinquedo cadastrado"
+          text="Cadastre os brinquedos para começar a controlar os aluguéis."
           action={
             isAdmin ? (
               <Link className="btn btn--primary" to="/carrinhos">
-                <Icon name="plus" size={19} /> Cadastrar carrinho
+                <Icon name="plus" size={19} /> Cadastrar brinquedo
               </Link>
             ) : (
-              <span className="muted">Peça ao administrador para cadastrar os carrinhos.</span>
+              <span className="muted">Peça ao administrador para cadastrar os brinquedos.</span>
             )
           }
         />
       ) : filteredCarts.length === 0 ? (
         <EmptyState
           icon="filter"
-          title="Nenhum carrinho neste filtro"
-          text="Troque a categoria ou o status para ver outros carrinhos."
+          title="Nenhum brinquedo neste filtro"
+          text="Troque a categoria ou o status para ver outros brinquedos."
           action={
             <Button variant="secondary" onClick={() => { setCategoryFilter('all'); setStatusFilter('all'); }}>
               Limpar filtros

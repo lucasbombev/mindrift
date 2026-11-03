@@ -68,7 +68,7 @@ function CategoryModal({ category, onClose, onSaved }) {
           <span className="category-preview__icon">{icone || '🏁'}</span>
           <div>
             <strong>{nome || 'Nome da categoria'}</strong>
-            <span>{ativo ? 'Aparece no cadastro de carrinhos' : 'Categoria inativa'}</span>
+            <span>{ativo ? 'Aparece no cadastro de brinquedos' : 'Categoria inativa'}</span>
           </div>
         </div>
         <Field label="Nome" htmlFor="category-name" required>
@@ -82,7 +82,7 @@ function CategoryModal({ category, onClose, onSaved }) {
             <button key={emoji} type="button" className={icone === emoji ? 'is-selected' : ''} onClick={() => setIcone(emoji)} disabled={loading}>{emoji}</button>
           ))}
         </div>
-        <Field label="Cor" htmlFor="category-color" hint="Usada no card do carrinho e nas abas.">
+        <Field label="Cor" htmlFor="category-color" hint="Usada no card do brinquedo e nas abas.">
           <div className="color-field">
             <input id="category-color" type="color" value={cor} onChange={(e) => setCor(e.target.value)} disabled={loading} />
             <Input value={cor} onChange={(e) => setCor(e.target.value)} maxLength={7} disabled={loading} />
@@ -94,7 +94,7 @@ function CategoryModal({ category, onClose, onSaved }) {
         <label className="switch-row">
           <span>
             <strong>Categoria ativa</strong>
-            <small>Inativas não aparecem para novos carrinhos.</small>
+            <small>Inativas não aparecem para novos brinquedos.</small>
           </span>
           <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} disabled={loading} />
         </label>
@@ -150,7 +150,7 @@ export function CategoriesPage() {
     <div className="container">
       <PageHeader
         title="Categorias"
-        subtitle="Cada carrinho pertence a uma categoria; a cor e o ícone aparecem no painel."
+        subtitle="Cada brinquedo pertence a uma categoria; a cor e o ícone aparecem no painel."
         eyebrow="Administração"
         actions={<Button icon="plus" onClick={() => setModal({ category: null })}>Nova categoria</Button>}
       />
@@ -173,7 +173,7 @@ export function CategoriesPage() {
                     <h2>{category.nome}</h2>
                     <Badge tone={category.ativo ? 'green' : 'gray'}>{category.ativo ? 'Ativa' : 'Inativa'}</Badge>
                   </div>
-                  <p>{count} carrinho(s) · slug {category.slug}</p>
+                  <p>{count} brinquedo(s) · slug {category.slug}</p>
                   <div className="category-admin__actions">
                     <Button size="sm" variant="secondary" icon="edit" onClick={() => setModal({ category })}>Editar</Button>
                     <IconButton icon="trash" label={`Excluir ${category.nome}`} variant="dangerGhost" onClick={() => setDeleting(category)} />
@@ -187,7 +187,7 @@ export function CategoriesPage() {
 
       <div className="admin-hint">
         <Icon name="info" size={17} />
-        <p>Categorias com carrinhos não são apagadas: são desativadas para preservar o histórico.</p>
+        <p>Categorias com brinquedos não são apagadas: são desativadas para preservar o histórico.</p>
       </div>
 
       {modal && <CategoryModal category={modal.category} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
@@ -196,7 +196,7 @@ export function CategoriesPage() {
         onClose={() => setDeleting(null)}
         onConfirm={handleDelete}
         title={`Excluir categoria ${deleting?.nome || ''}?`}
-        message="Se houver carrinhos ou planos nesta categoria, ela será apenas desativada."
+        message="Se houver brinquedos ou planos nesta categoria, ela será apenas desativada."
         confirmLabel="Excluir categoria"
         loading={deleteLoading}
       />

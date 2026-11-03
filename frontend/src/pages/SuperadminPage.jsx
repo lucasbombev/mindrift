@@ -217,7 +217,7 @@ export function SuperadminPage() {
 
         <div className="superadmin-metrics">
           <div><span>Tenants ativos</span><strong>{metrics?.tenantsAtivos ?? '—'}</strong></div>
-          <div><span>Carrinhos</span><strong>{metrics?.carrinhos ?? '—'}</strong></div>
+          <div><span>Brinquedos</span><strong>{metrics?.carrinhos ?? '—'}</strong></div>
           <div><span>Sessões hoje</span><strong>{metrics?.sessoesHoje ?? '—'}</strong></div>
         </div>
 

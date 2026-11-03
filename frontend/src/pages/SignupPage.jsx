@@ -62,7 +62,7 @@ export function SignupPage() {
           <h1>
             Seu negócio,
             <br />
-            sua própria pista.
+            seu próprio negócio.
           </h1>
           <p>
             Crie um espaço isolado para sua frota, seus operadores e seu caixa. Você começa com

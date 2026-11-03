@@ -36,7 +36,7 @@ export function SettingsPage() {
         fetch('/api/health').then((res) => res.ok).catch(() => false),
       ]);
       setSettings(settingsData.settings);
-      setNome(settingsData.settings.nome_estabelecimento || 'Mindrift');
+      setNome(settingsData.settings.nome_estabelecimento || 'Leao Brinquedos');
       setLead(Number(settingsData.settings.alert_lead_seconds) === 30 ? 30 : Number(settingsData.settings.alert_lead_seconds) === 0 ? 0 : 60);
       setSomFim(settingsData.settings.som_fim || 'alarme');
       setSomRepetir(settingsData.settings.som_repetir !== '0');

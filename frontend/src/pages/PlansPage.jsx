@@ -237,7 +237,7 @@ export function PlansPage() {
               </div>
               <strong className="plan-admin__price">{brl(plan.valorCentavos)}</strong>
               <span className="plan-admin__per">
-                {formatDurationMinutes(plan.minutos)} de pista
+                {formatDurationMinutes(plan.minutos)} de uso
                 {plan.minutos > 0 && ` · ${brl(Math.round(plan.valorCentavos / plan.minutos))}/min`}
                 <br />
                 <span className="plan-admin__category">

@@ -14,7 +14,7 @@ import { formatPhoneDisplay } from '../lib/phone.js';
 const ADMIN_LINKS = [
   { to: '/relatorios', label: 'Relatórios', icon: 'chart', desc: 'Faturamento, horários e pendências' },
   { to: '/caixa', label: 'Caixa', icon: 'cash', desc: 'Recebimentos e fechamento' },
-  { to: '/carrinhos', label: 'Carrinhos', icon: 'cart', desc: 'Fotos, categorias e status' },
+  { to: '/carrinhos', label: 'Brinquedos', icon: 'cart', desc: 'Fotos, categorias e status' },
   { to: '/categorias', label: 'Categorias', icon: 'tag', desc: 'Drift, kart, patinete e mais' },
   { to: '/planos', label: 'Planos', icon: 'timer', desc: 'Tempos, valores e categorias' },
   { to: '/qrcodes', label: 'QR Codes', icon: 'qr', desc: 'Imprimir etiquetas da frota' },

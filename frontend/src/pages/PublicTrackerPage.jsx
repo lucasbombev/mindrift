@@ -69,8 +69,8 @@ export function PublicTrackerPage() {
   }, [tenantSlug]);
 
   useEffect(() => {
-    document.title = 'Acompanhar tempo · Mindrift';
-    return () => { document.title = 'Mindrift · Painel da pista'; };
+    document.title = 'Acompanhar tempo · Leao Brinquedos';
+    return () => { document.title = 'Leao Brinquedos · Painel de brinquedos'; };
   }, []);
 
   useEffect(() => {
@@ -193,8 +193,8 @@ export function PublicTrackerPage() {
         )}
 
         <footer className="tracker-footer">
-          <strong>Mindrift</strong>
-          <span>Em caso de dúvida, chame o operador.</span>
+          <strong>Leao Brinquedos</strong>
+          <span>gestão de brinquedos · Em caso de dúvida, chame o operador.</span>
         </footer>
       </div>
     </main>

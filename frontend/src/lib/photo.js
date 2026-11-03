@@ -32,7 +32,7 @@ export async function preparePhoto(file) {
 
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.82));
   if (!blob) throw new Error('Não foi possível processar a foto.');
-  return new File([blob], `carrinho-${Date.now()}.jpg`, { type: 'image/jpeg' });
+  return new File([blob], `brinquedo-${Date.now()}.jpg`, { type: 'image/jpeg' });
 }
 
 function loadImageElement(file) {

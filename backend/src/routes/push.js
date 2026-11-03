@@ -116,7 +116,7 @@ export function createPushRouter(db) {
       const send = async () => {
         const result = await sendToUser(db, req.tenantId, req.user.id, {
           title: 'Tempo esgotado!',
-          body: 'Teste de notificação do Mindrift: o aluguel do veículo de teste terminou.',
+          body: 'Teste de notificação do Leao Brinquedos: o aluguel do veículo de teste terminou.',
           url: '/em-uso',
           som: '/sounds/alarme.wav',
           tag: 'mindrift-test-push',

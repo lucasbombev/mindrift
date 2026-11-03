@@ -84,7 +84,7 @@ export function CartStatusModal({ open, onClose, cart, onSuccess }) {
         {blocked ? (
           <div className="status-blocked">
             <strong>Encerre a sessão primeiro.</strong>
-            <span>Não é possível mudar o status de um carrinho em uso.</span>
+            <span>Não é possível mudar o status de um brinquedo em uso.</span>
           </div>
         ) : (
           <>

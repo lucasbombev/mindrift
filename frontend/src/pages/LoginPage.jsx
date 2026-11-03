@@ -39,13 +39,13 @@ export function LoginPage() {
             <Logo size={62} withWordmark />
           </div>
           <h1>
-            A pista inteira
+            Toda a diversão
             <br />
             na palma da mão.
           </h1>
           <p>
-            Controle aluguéis, timers e caixa em tempo real, direto na rede local da praça. Sem
-            internet, sem complicação.
+            Controle aluguéis, timers e caixa em tempo real, no seu negócio. Sem internet,
+            sem complicação.
           </p>
           <ul className="login-features">
             <li>

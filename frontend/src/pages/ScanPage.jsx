@@ -62,7 +62,7 @@ function ScanResult({ token, onScanAnother }) {
     setCheckinLoading(true);
     try {
       await api.post(`/carts/${data.cart.id}/checkin`, { observacao: observacao.trim() || undefined });
-      toast('Check-in concluído. Carrinho disponível.', { type: 'success' });
+      toast('Check-in concluído. Brinquedo disponível.', { type: 'success' });
       setObservacao('');
       await load();
     } catch (err) {
@@ -137,7 +137,7 @@ function ScanResult({ token, onScanAnother }) {
             <span className="scan-action-card__icon is-ready"><Icon name="play" size={28} /></span>
             <div>
               <h2>Pronto para alugar</h2>
-              <p>Check-out: inicie o timer agora. O carrinho passa para “em uso”.</p>
+              <p>Check-out: inicie o timer agora. O brinquedo passa para “em uso”.</p>
             </div>
           </div>
           <Button size="lg" icon="play" block onClick={() => setModal({ type: 'start' })}>
@@ -217,7 +217,7 @@ function ScanResult({ token, onScanAnother }) {
             <span className="scan-action-card__icon is-charging"><Icon name="refresh" size={28} /></span>
             <div>
               <h2>Na carga</h2>
-              <p>Check-in: marque quando o equipamento estiver pronto para voltar à pista.</p>
+              <p>Check-in: marque quando o equipamento estiver pronto para voltar a funcionar.</p>
             </div>
           </div>
           <Button size="lg" icon="check" block loading={checkinLoading} onClick={checkin}>
@@ -244,7 +244,7 @@ function ScanResult({ token, onScanAnother }) {
             </Button>
           ) : (
             <InfoNote tone="warning" icon="lock">
-              Peça a um administrador para liberar este carrinho da manutenção.
+              Peça a um administrador para liberar este brinquedo da manutenção.
             </InfoNote>
           )}
         </section>
@@ -252,7 +252,7 @@ function ScanResult({ token, onScanAnother }) {
 
       {cart.status === 'em_uso' && !activeSession && !collective && (
         <InfoNote tone="warning" icon="alert">
-          O carrinho está marcado como em uso, mas não há sessão ativa. Peça ao administrador para
+          O brinquedo está marcado como em uso, mas não há sessão ativa. Peça ao administrador para
           ajustar o status.
         </InfoNote>
       )}
@@ -354,7 +354,7 @@ function ScannerView() {
     } catch (err) {
       setScanning(false);
       setCameraError(
-        'Não foi possível abrir a câmera. Verifique a permissão ou use o código do carrinho abaixo.',
+        'Não foi possível abrir a câmera. Verifique a permissão ou use o código do brinquedo abaixo.',
       );
       try { await scannerRef.current?.clear(); } catch { /* noop */ }
       scannerRef.current = null;
@@ -382,7 +382,7 @@ function ScannerView() {
     <div className="container scan-page">
       <PageHeader
         title="Escanear"
-        subtitle="Aponte a câmera para o QR do carrinho. Escaneou, alugou."
+        subtitle="Aponte a câmera para o QR do brinquedo. Escaneou, alugou."
         eyebrow="Check-in e check-out"
       />
 
@@ -413,7 +413,7 @@ function ScannerView() {
           <Icon name="keyboard" size={20} />
           <div>
             <strong>Sem câmera? Digite o código</strong>
-            <span>O mesmo fluxo abre a tela certa do carrinho.</span>
+            <span>O mesmo fluxo abre a tela certa do brinquedo.</span>
           </div>
         </div>
         <form onSubmit={manualSubmit} className="scanner-manual__form">

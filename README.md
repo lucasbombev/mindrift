@@ -1,7 +1,7 @@
-# 🏁 Mindrift
+# 🏁 Leao Brinquedos
 
-SaaS local (LAN/Tailscale) para alugar carrinhos de drift, kart, patinete, quadriciclo e outras
-categorias por tempo. O notebook da pista roda **servidor + SQLite**; operadores e administradores
+SaaS local (LAN/Tailscale) para alugar brinquedos de drift, kart, patinete, quadriciclo e outras
+categorias por tempo. O servidor local roda **servidor + SQLite**; operadores e administradores
 usam **celular pelo navegador ou PWA**. Não há CDN, serviço pago ou dependência de nuvem.
 
 A versão atual é **multi-tenant**: cada negócio tem sua própria frota, usuários, categorias, planos,
@@ -11,14 +11,14 @@ sessões, caixa e configurações. Um administrador **nunca** acessa dados de ou
 
 - **Multi-tenant** com signup público, isolamento por `tenant_id` e superadmin separado.
 - **Categorias** por negócio (Drift, Kart, Patinete, Quadriciclo + novas categorias).
-- **QR Code** por carrinho com impressão de etiquetas 5 × 5 cm, PDF A4 e leitura pela câmera.
+- **QR Code** por brinquedo com impressão de etiquetas 5 × 5 cm, PDF A4 e leitura pela câmera.
 - **Check-in/check-out visual**: encerrar escolhendo o destino do equipamento em 1 toque.
 - **Cliente opcional**, editável depois, com relatórios agrupando “Sem identificação”.
 - **Superadmin completo**: ciclo de vida de tenants, métricas, impersonação auditada, reset/transferência de admin, comunicado global e painel **Sistema**.
 - **Telefone** do usuário com máscara brasileira e E.164.
 - **Som configurável** por tenant e por usuário (6 sons locais, volume, vibração e repetição).
-- **Operador pode alterar status** do carrinho com motivo e histórico (`CartStatusEvent`).
-- **Nome Mindrift** em toda a interface, PWA e manifest.
+- **Operador pode alterar status** do brinquedo com motivo e histórico (`CartStatusEvent`).
+- **Nome Leao Brinquedos** em toda a interface, PWA e manifest.
 - **Menu reorganizado**: Início, Escanear, Em uso, Histórico e Mais; Relatórios/Caixa em **Mais → Administração**.
 - **Timer livre** (0 minutos) progressivo, sem fim previsto, encerrado manualmente com valor informado.
 - **Web Push** opcional para avisar o tempo esgotado com o app fechado.
@@ -27,11 +27,11 @@ sessões, caixa e configurações. Um administrador **nunca** acessa dados de ou
 
 ## 0. Identidade e navegação
 
-- Nome do app: **Mindrift** (título da aba, logo, login, manifest, health e documentação).
+- Nome do app: **Leao Brinquedos** (título da aba, logo, login, manifest, health e documentação).
 - Menu superior: **Início · Escanear · Em uso · Histórico · Mais**.
-- **Mais → Administração** (admin): Relatórios, Caixa, Carrinhos, Categorias, Planos, QR Codes,
+- **Mais → Administração** (admin): Relatórios, Caixa, Brinquedos, Categorias, Planos, QR Codes,
   Usuários e Ajustes.
-- **Em uso** lista todas as sessões ativas com foto, carrinho, cliente, timer (regressivo ou livre)
+- **Em uso** lista todas as sessões ativas com foto, brinquedo, cliente, timer (regressivo ou livre)
   e botão **Encerrar aluguel**.
 
 ---
@@ -116,7 +116,7 @@ O Tailscale usa certificado confiável; **não é necessário instalar CA local*
 - **Safari iOS:** abra a URL HTTPS → **Compartilhar** → **Adicionar à Tela de Início**.
 - No notebook, `localhost` também é contexto seguro.
 
-O app tem manifest **Mindrift** / **Mindrift**, modo standalone, orientação retrato,
+O app tem manifest **Leao Brinquedos** / **Leao Brinquedos**, modo standalone, orientação retrato,
 service worker com precache do shell, `/api/*` em **NetworkOnly** e banner
 **“Nova versão disponível — atualizar”**. O timer nunca é recarregado automaticamente.
 
@@ -148,7 +148,7 @@ Ao concluir, o sistema:
 5. cria as configurações iniciais;
 6. autentica o admin e abre o painel.
 
-Cada negócio começa vazio de carrinhos. O admin cadastra a frota, operadores e planos.
+Cada negócio começa vazio de brinquedos. O admin cadastra a frota, operadores e planos.
 
 ### Login
 
@@ -162,7 +162,7 @@ Cada negócio começa vazio de carrinhos. O admin cadastra a frota, operadores e
 O superadmin não é um admin de negócio. Ele acessa **Negócios** e **Sistema**.
 
 **Negócios**
-- métricas globais: tenants ativos, total de carrinhos e sessões do dia;
+- métricas globais: tenants ativos, total de brinquedos e sessões do dia;
 - cria negócios (tenant + admin inicial + categorias/planos + telefone obrigatório);
 - suspende, reativa, faz soft delete, restaura e faz hard delete (com segunda confirmação pelo slug/nome);
 - transfere o admin para outro usuário do tenant;
@@ -201,15 +201,15 @@ um registro de auditoria; ao sair, o acesso é encerrado e o token deixa de func
 
 ## 4. Categorias e planos
 
-- **Mais → Categorias**: criar, editar, ativar/desativar. Categorias com carrinhos não são apagadas;
+- **Mais → Categorias**: criar, editar, ativar/desativar. Categorias com brinquedos não são apagadas;
   são desativadas para preservar o histórico.
-- Todo carrinho exige uma categoria; o card mostra **cor + ícone + nome**.
+- Todo brinquedo exige uma categoria; o card mostra **cor + ícone + nome**.
 - O dashboard tem filtros por **categoria** e por **status**, persistidos por usuário no `localStorage`.
 - A aba **Em uso** tem **Renovar** (para timers com fim previsto) e **Encerrar**, e atualiza por Socket.IO.
 - **Mais → Planos**: um plano pode ser:
   - **global** (`category_id = NULL`): vale para todas as categorias;
-  - **específico**: aparece e é aceito somente para carrinhos daquela categoria.
-- O seletor de plano no início/renovação mostra globais + específicos da categoria do carrinho.
+  - **específico**: aparece e é aceito somente para brinquedos daquela categoria.
+- O seletor de plano no início/renovação mostra globais + específicos da categoria do brinquedo.
 - O backend também valida: mandar um plano de outra categoria retorna 400.
 
 Categorias iniciais:
@@ -228,7 +228,7 @@ Categorias iniciais:
 ### Iniciar aluguel
 
 - Pelo dashboard: **Novo aluguel** ou **Iniciar aluguel** no card.
-- Pelo QR: **Escanear** → câmera → tela do carrinho → **Iniciar aluguel agora**.
+- Pelo QR: **Escanear** → câmera → tela do brinquedo → **Iniciar aluguel agora**.
 - O nome do cliente é **opcional**; se vazio, a UI mostra **“Cliente não informado”**.
 - Escolha plano (filtrado pela categoria) ou valor avulso.
 - Em **Outro valor**, digite **0 minutos** para iniciar um **timer livre**: o tempo conta para cima,
@@ -243,7 +243,7 @@ Ao encerrar, o operador escolhe em **1 toque** o destino:
 2. **Enviar para Carregamento**
 3. **Enviar para Manutenção**
 
-O pagamento pode ser recebido no encerramento ou ficar pendente no histórico. O carrinho vai para o
+O pagamento pode ser recebido no encerramento ou ficar pendente no histórico. O brinquedo vai para o
 status escolhido independentemente do pagamento. Em timer livre, o operador informa o **valor a
 cobrar** no encerramento; a duração decorrida aparece no modal.
 
@@ -254,7 +254,7 @@ cobrar** no encerramento; a duração decorrida aparece no modal.
 - Em todo card há um menu **⋮** com os status válidos (disponível ↔ carregando ↔ manutenção)
   quando não há sessão ativa. Entrar em manutenção exige motivo (bateria, motor, pneu, estrutura ou
   outro + observação) e grava um `CartStatusEvent`.
-- Em carrinho em uso o botão fica desabilitado com o aviso **“Encerre a sessão primeiro”**.
+- Em brinquedo em uso o botão fica desabilitado com o aviso **“Encerre a sessão primeiro”**.
 - O histórico do modal de status mostra as últimas mudanças e o autor.
 - **Disponível:** oferece **Iniciar aluguel agora**.
 - **Em uso:** oferece **Renovar**, **Encerrar**, **Registrar pagamento** e **Editar cliente**.
@@ -268,11 +268,11 @@ exemplo, abre o mesmo fluxo do QR.
 
 ## 6. QR Codes e etiquetas
 
-A tela **Mais → QR Codes** (admin) mostra todos os carrinhos, agrupados por categoria.
+A tela **Mais → QR Codes** (admin) mostra todos os brinquedos, agrupados por categoria.
 No topo há o **QR Code para os Pais**: gera um pôster A4 com QR grande, o endereço dinâmico
 `/acompanhar/<slug>` e o texto “Acompanhe o tempo do seu filho!”.
 
-Cada carrinho tem um `qr_token` opaco (UUID v4), independente do ID numérico. O QR aponta para:
+Cada brinquedo tem um `qr_token` opaco (UUID v4), independente do ID numérico. O QR aponta para:
 
 ```text
 https://SEU-ENDERECO/scan/<qr_token>
@@ -283,7 +283,7 @@ Ações:
 - **Imprimir QR:** abre a impressão do navegador com uma etiqueta de **5 × 5 cm**
   (QR + código + categoria + nome do negócio).
 - **Baixar PNG:** gera um PNG da etiqueta no próprio navegador.
-- **Imprimir todos (PDF):** o backend gera um **PDF A4** com uma etiqueta por carrinho, em grade
+- **Imprimir todos (PDF):** o backend gera um **PDF A4** com uma etiqueta por brinquedo, em grade
   (3 colunas × 4 linhas, 12 por página), usando `pdfkit` + `qrcode`.
 
 O QR gerado usa o **origin atual** do navegador. Se você abrir o admin pelo Tailscale, a etiqueta
@@ -411,7 +411,7 @@ servidor mostra `[push] teste manual ... enviados=... falhas=...`.
 
 ## 7.4 Equipamentos coletivos
 
-- `carts.capacidade_maxima = 1` mantém o comportamento dos carrinhos de drift.
+- `carts.capacidade_maxima = 1` mantém o comportamento dos brinquedos de drift.
 - Valores maiores (ex.: 10) permitem várias sessões ativas simultâneas no mesmo equipamento.
 - Cada sessão tem seu próprio cliente, plano, timer e encerramento.
 - O status é derivado:
@@ -447,7 +447,7 @@ servidor mostra `[push] teste manual ... enviados=... falhas=...`.
 |---|---|---|---|
 | Criar/desativar tenant | ✅ | ❌ | ❌ |
 | Ver/gerenciar dados operacionais | ❌ (só impersonação) | ✅ (próprio tenant) | ✅ (próprio tenant) |
-| Criar/editar carrinhos, planos, categorias | ❌ | ✅ | ❌ |
+| Criar/editar brinquedos, planos, categorias | ❌ | ✅ | ❌ |
 | Gerenciar usuários | ❌ | ✅ | ❌ |
 | Iniciar/renovar/encerrar sessão | ❌ | ✅ | ✅ |
 | Registrar pagamento | ❌ | ✅ | ✅ |
@@ -455,7 +455,7 @@ servidor mostra `[push] teste manual ... enviados=... falhas=...`.
 | Cancelar/excluir sessão | ❌ | ✅ | ❌ |
 | Caixa, relatórios, configurações | ❌ | ✅ | ❌ |
 | QR Codes / imprimir etiquetas | ❌ | ✅ | ❌ |
-| Alterar status do carrinho (sem sessão) | ❌ | ✅ | ✅ |
+| Alterar status do brinquedo (sem sessão) | ❌ | ✅ | ✅ |
 | Ver infraestrutura/logs/backups | ✅ (Sistema) | ❌ | ❌ |
 | Impersonar admin e resetar senha | ✅ | ❌ | ❌ |
 | Comunicado global | ✅ | ❌ | ❌ |
@@ -508,7 +508,7 @@ npm test
 **40 testes** cobrem autenticação/refresh, rate limit, adiantado, renovação, encerramento, caixa, isolamento entre
 tenants, signup público, suspensão/bloqueio, impersonação auditada, reset/transferência de admin,
 soft/hard delete, métricas, comunicado global, categorias, planos por categoria, QR/PDF, check-in,
-destino do carrinho, telefone, preferências de som, mudança de status com `CartStatusEvent`, timer livre, inscrição push, portal público seguro e alteração de senha auditada do superadmin.
+destino do brinquedo, telefone, preferências de som, mudança de status com `CartStatusEvent`, timer livre, inscrição push, portal público seguro e alteração de senha auditada do superadmin.
 
 ### Manual no celular (via Tailscale)
 
@@ -516,15 +516,15 @@ Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no cel
 
 **Multi-tenant**
 - [ ] Abrir `/cadastro`, criar “Praça Teste” com um admin novo; o painel abre com 4 categorias e
-      3 planos e **0 carrinhos**.
+      3 planos e **0 brinquedos**.
 - [ ] Sair e entrar com o admin do tenant default; a frota dele não aparece para a Praça Teste.
 - [ ] Entrar como `superadmin`; criar um negócio pelo botão **Novo negócio**; ver os negócios; desativar a Praça Teste; tentar usar o token
       antigo (deve cair no login); reativar.
 - [ ] Logar como operador de um tenant e confirmar que ele só vê a frota/histórico daquele tenant.
 
 **Categorias**
-- [ ] Admin cria “Bicicleta”; ela aparece no cadastro de carrinho.
-- [ ] Cadastrar carrinho com Bicicleta; o card mostra ícone/cor.
+- [ ] Admin cria “Bicicleta”; ela aparece no cadastro de brinquedo.
+- [ ] Cadastrar brinquedo com Bicicleta; o card mostra ícone/cor.
 - [ ] No dashboard, filtrar por Bicicleta e por status; combinar os dois.
 - [ ] Criar plano específico de Bicicleta e um global; iniciar aluguel de Bicicleta e conferir que
       só aparecem os dois.
@@ -532,9 +532,9 @@ Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no cel
 
 **QR / check-in**
 - [ ] Admin abre **QR Codes**; imprime uma etiqueta (5 × 5 cm) e baixa o PDF A4.
-- [ ] Escanear o QR de carrinho disponível; iniciar aluguel.
-- [ ] Escanear carrinho em manutenção: não deve permitir aluguel; admin libera com observação.
-- [ ] Escanear carrinho em uso; encerrar e escolher **Carregamento**; escanear de novo e tocar em
+- [ ] Escanear o QR de brinquedo disponível; iniciar aluguel.
+- [ ] Escanear brinquedo em manutenção: não deve permitir aluguel; admin libera com observação.
+- [ ] Escanear brinquedo em uso; encerrar e escolher **Carregamento**; escanear de novo e tocar em
       **Marcar como Disponível**.
 - [ ] Escanear o QR de outro tenant: deve mostrar “QR não reconhecido neste negócio”.
 - [ ] Negar a permissão da câmera e usar o código manual; o fluxo deve continuar.
@@ -561,10 +561,10 @@ Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no cel
 - [ ] Recarregar o PWA e confirmar que som/volume/vibração continuam salvos.
 - [ ] Admin ajusta som padrão, pré-alerta 60/30/desligado e repetição até dispensar; o próximo alerta usa a preferência.
 
-**Status do carrinho**
-- [ ] Operador abre **⋮** em um carrinho disponível e envia para manutenção com motivo **pneu** + observação.
+**Status do brinquedo**
+- [ ] Operador abre **⋮** em um brinquedo disponível e envia para manutenção com motivo **pneu** + observação.
 - [ ] Card mostra manutenção; tentar iniciar aluguel deve falhar; histórico do modal mostra o evento.
-- [ ] Em carrinho em uso, o botão **⋮** está desabilitado com o aviso “Encerre a sessão primeiro”.
+- [ ] Em brinquedo em uso, o botão **⋮** está desabilitado com o aviso “Encerre a sessão primeiro”.
 - [ ] Voltar para disponível/carregando e conferir cada transição.
 
 **Equipamentos coletivos**
@@ -576,7 +576,7 @@ Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no cel
 - [ ] Encerrar Maria; o equipamento volta para disponível.
 
 **Identidade, menu e timer livre**
-- [ ] Título/logo/manifest mostram **Mindrift**.
+- [ ] Título/logo/manifest mostram **Leao Brinquedos**.
 - [ ] Menu superior mostra **Início, Escanear, Em uso, Histórico, Mais**; Relatórios/Caixa estão em Mais → Administração.
 - [ ] A tela **Em uso** lista todos os aluguéis ativos com foto e timer; **Renovar** e **Encerrar aluguel** funcionam.
 - [ ] Filtrar por Drift + Disponível, navegar para Histórico e voltar: os filtros continuam ativos.
@@ -621,11 +621,11 @@ JWT_REFRESH_SECRET=...
 DB_PATH=data/drift.db
 UPLOAD_DIR=uploads
 BACKUP_DIR=backups
-LOG_PATH=logs/mindrift.log
+LOG_PATH=logs/leaobrinquedos.log
 TAILSCALE_URL=
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
-VAPID_SUBJECT=mailto:contato@mindrift.local
+VAPID_SUBJECT=mailto:contato@leaobrinquedos.local
 
 SUPERADMIN_USERNAME=superadmin
 SUPERADMIN_PASSWORD=superadmin123
@@ -691,4 +691,4 @@ npm run cert    # gera CA/certificado local
 | Migração falhou | O rollback automático manteve o schema; restaure o `pre-migration-*.db` conforme `MIGRACAO.md`. |
 | Tenant suspenso | Superadmin deve reativar; o login retorna 403 com a mensagem de suspensão. |
 | Sons não tocam no iPhone | Toque na tela primeiro para desbloquear o AudioContext; verifique volume e preferências. |
-| Botão ⋮ do carrinho desabilitado | Há sessão ativa; encerre a sessão primeiro. |
+| Botão ⋮ do brinquedo desabilitado | Há sessão ativa; encerre a sessão primeiro. |

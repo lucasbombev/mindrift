@@ -331,7 +331,7 @@ function migrateLegacy(db) {
        FROM users_old`,
     ).run(tenantId);
 
-    // Carrinhos recebem categoria Drift e um QR token opaco.
+    // Brinquedos recebem categoria Drift e um QR token opaco.
     const oldCarts = db.prepare('SELECT * FROM carts_old').all();
     const insertCart = db.prepare(
       `INSERT INTO carts

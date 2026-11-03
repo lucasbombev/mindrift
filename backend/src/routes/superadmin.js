@@ -454,7 +454,7 @@ export function createSuperadminRouter(db) {
   router.get('/system/logs/download', (req, res, next) => {
     try {
       if (!fs.existsSync(config.logPath)) throw notFound('Arquivo de log ainda não existe.');
-      res.download(config.logPath, 'mindrift.log');
+      res.download(config.logPath, 'leaobrinquedos.log');
     } catch (err) {
       next(err);
     }

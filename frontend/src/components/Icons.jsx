@@ -307,7 +307,7 @@ export function Logo({ size = 44, withWordmark = false, className = '' }) {
         height={size}
         viewBox="0 0 64 64"
         role="img"
-        aria-label="Mindrift"
+        aria-label="Leao Brinquedos"
         style={{ flex: '0 0 auto', borderRadius: size * 0.26, display: 'block' }}
       >
         <rect width="64" height="64" rx="16" fill="#0b1220" />
@@ -324,8 +324,8 @@ export function Logo({ size = 44, withWordmark = false, className = '' }) {
       </svg>
       {withWordmark && (
         <span className="logo__wordmark">
-          <strong>Mindrift</strong>
-          <span>GESTÃO DE PISTA</span>
+          <strong>Leao Brinquedos</strong>
+          <span>gestão de brinquedos</span>
         </span>
       )}
     </span>

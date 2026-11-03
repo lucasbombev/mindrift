@@ -87,7 +87,7 @@ export function createApp({ db }) {
   app.get('/api/health', (_req, res) => {
     res.json({
       ok: true,
-      nome: 'Mindrift',
+      nome: 'Leao Brinquedos',
       versao: config.version,
       horarioServidor: new Date().toISOString(),
       uptimeSegundos: Math.round(process.uptime()),
@@ -114,7 +114,7 @@ export function createApp({ db }) {
     if (!fs.existsSync(config.caCertPath)) {
       return res.status(404).type('text/plain').send('Certificado local não gerado.');
     }
-    res.download(config.caCertPath, 'mindrift-ca.crt');
+    res.download(config.caCertPath, 'leaobrinquedos-ca.crt');
   });
 
   app.use('/api/auth', createAuthRouter(db));
@@ -229,7 +229,7 @@ export function createApp({ db }) {
         erro: {
           codigo: isActiveSession ? 'carrinho_em_uso' : 'conflito',
           mensagem: isActiveSession
-            ? 'Este carrinho já possui uma sessão ativa.'
+            ? 'Este brinquedo já possui uma sessão ativa.'
             : 'Não foi possível salvar: registro duplicado ou em uso.',
         },
       });

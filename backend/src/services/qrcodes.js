@@ -79,7 +79,7 @@ export async function buildLabelsPdf({ tenantName, carts, baseUrl }) {
   }
 
   if (carts.length === 0) {
-    doc.fontSize(14).fillColor('#334155').text('Nenhum carrinho para imprimir.', 40, 60);
+    doc.fontSize(14).fillColor('#334155').text('Nenhum brinquedo para imprimir.', 40, 60);
   }
 
   doc.end();

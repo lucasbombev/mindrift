@@ -164,7 +164,7 @@ export function useTimerAlerts({ sessions, alertLeadSeconds, soundEnabled, onSou
     let flip = false;
     const timer = setInterval(() => {
       flip = !flip;
-      document.title = flip ? '⏰ TEMPO ESGOTADO — Mindrift' : 'Mindrift · Painel da pista';
+      document.title = flip ? '⏰ TEMPO ESGOTADO — Leao Brinquedos' : 'Leao Brinquedos · Painel de brinquedos';
     }, 1200);
     return () => {
       clearInterval(timer);

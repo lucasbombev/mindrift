@@ -134,7 +134,7 @@ export function ReportsPage() {
     <div className="container">
       <PageHeader
         title="Relatórios"
-        subtitle="Faturamento, ticket médio, carrinhos e devedores."
+        subtitle="Faturamento, ticket médio, brinquedos e devedores."
         eyebrow="Administração"
       />
 
@@ -310,7 +310,7 @@ export function ReportsPage() {
             <section className="report-card">
               <header className="report-card__head">
                 <div>
-                  <h2>Carrinhos</h2>
+                  <h2>Brinquedos</h2>
                   <p>Mais usados e receita gerada</p>
                 </div>
               </header>
