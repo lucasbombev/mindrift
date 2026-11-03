@@ -81,6 +81,30 @@ function normalizeClientName(value) {
   return text || null;
 }
 
+function nextChildLabel(db, tenantId, cartId) {
+  const rows = db
+    .prepare(
+      `SELECT cliente_nome FROM sessions
+       WHERE tenant_id = ? AND cart_id = ?
+         AND status = 'em_andamento' AND excluida_em IS NULL
+         AND cliente_nome IS NOT NULL`,
+    )
+    .all(tenantId, cartId);
+  const used = new Set();
+  for (const row of rows) {
+    const normalized = String(row.cliente_nome)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+    const match = normalized.match(/^crianca\s+(\d+)$/);
+    if (match) used.add(Number(match[1]));
+  }
+  let number = 1;
+  while (used.has(number)) number += 1;
+  return `Criança ${number}`;
+}
+
 function assertPayment(formaPagamento, paid) {
   if (paid && !PAYMENT_METHODS.includes(formaPagamento)) {
     throw badRequest('Escolha a forma de pagamento: dinheiro, pix ou cartão.');
@@ -156,9 +180,9 @@ export function startSession(db, tenantId, input, operator) {
         'equipamento_lotado',
       );
     }
-    const cliente = normalizeClientName(input.cliente_nome);
+    let cliente = normalizeClientName(input.cliente_nome);
     if (capacity > 1 && !cliente) {
-      throw badRequest('Informe o nome da criança para identificar a sessão.');
+      cliente = nextChildLabel(db, tenantId, cart.id);
     }
 
     const pricing = resolvePricing(db, tenantId, input, cart.category_id);

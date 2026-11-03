@@ -418,7 +418,7 @@ servidor mostra `[push] teste manual ... enviados=... falhas=...`.
   - **disponível**: nenhuma sessão ativa;
   - **em uso**: 1..capacidade-1 sessões;
   - **lotado**: capacidade atingida.
-- Em equipamentos coletivos, `cliente_nome` é obrigatório.
+- Em equipamentos coletivos, `cliente_nome` é opcional. Se ficar em branco, o backend atribui automaticamente **Criança 1**, **Criança 2** etc., sem repetir números entre sessões ativas do mesmo brinquedo.
 - A aba **Em uso** agrupa o resumo de ocupação (`Pula-Pula: 3/10`) e lista uma linha por criança.
 - O push informa o nome e o equipamento da criança e abre `/em-uso?session=<id>`, destacando a sessão.
 
@@ -570,6 +570,7 @@ Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no cel
 **Equipamentos coletivos**
 - [ ] Cadastrar um equipamento com capacidade 10.
 - [ ] Iniciar João (15 min) e Maria (10 min) sem encerrar João.
+- [ ] Iniciar uma terceira entrada sem nome e confirmar que aparece como **Criança 1** automaticamente.
 - [ ] Confirmar 2 cards independentes em **Em uso** e o resumo de ocupação.
 - [ ] Encerrar apenas João; Maria continua e o equipamento segue em uso.
 - [ ] Tentar adicionar além da capacidade; deve ser recusado.

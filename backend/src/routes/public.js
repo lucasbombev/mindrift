@@ -29,7 +29,9 @@ function normalizeName(value) {
 }
 
 function maskedName(value) {
-  const parts = String(value || '').trim().split(/\s+/).filter(Boolean);
+  const text = String(value || '').trim();
+  if (/^Crian[cç]a\s+\d+$/i.test(text)) return text;
+  const parts = text.split(/\s+/).filter(Boolean);
   if (!parts.length) return 'Cliente';
   if (parts.length === 1) return parts[0];
   return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;

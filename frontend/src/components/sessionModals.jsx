@@ -194,7 +194,6 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
     event.preventDefault();
     setError('');
     if (!cartId) return setError('Escolha um brinquedo.');
-    if (collective && !cliente.trim()) return setError('Informe o nome da criança.');
     if (!result.valid) return setError('Escolha um plano válido ou informe minutos (0 = livre) e valor.');
     if (result.minutes === 0 && pagamentoAdiantado) return setError('Timer livre só pode ser pago no encerramento.');
     setLoading(true);
@@ -266,20 +265,18 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
         </Field>
 
         <Field
-          label={collective ? 'Nome da criança' : 'Nome do cliente (opcional)'}
+          label={collective ? 'Nome da criança (opcional)' : 'Nome do cliente (opcional)'}
           htmlFor="cliente"
-          required={collective}
-          hint={collective ? 'Obrigatório para identificar a sessão individual no equipamento coletivo.' : 'Pode iniciar sem nome e preencher depois no histórico.'}
+          hint={collective ? 'Se deixar em branco, o sistema atribui Criança 1, Criança 2... automaticamente.' : 'Pode iniciar sem nome e preencher depois no histórico.'}
         >
           <Input
             id="cliente"
             value={cliente}
             onChange={(event) => setCliente(event.target.value)}
-            placeholder={collective ? 'Ex.: João' : 'Ex.: João (ou deixe em branco)'}
+            placeholder={collective ? 'Ex.: João (ou deixe em branco)' : 'Ex.: João (ou deixe em branco)'}
             maxLength={80}
             autoComplete="off"
             disabled={loading}
-            required={collective}
           />
         </Field>
 
