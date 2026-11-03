@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { SignupPage } from './pages/SignupPage.jsx';
@@ -23,6 +23,7 @@ import { SuperadminPage } from './pages/SuperadminPage.jsx';
 import { CategoriesPage } from './pages/CategoriesPage.jsx';
 import { QrCodesPage } from './pages/QrCodesPage.jsx';
 import { ScanPage } from './pages/ScanPage.jsx';
+import { PublicTrackerPage } from './pages/PublicTrackerPage.jsx';
 
 function AdminOnly({ children }) {
   const { isAdmin } = useAuth();
@@ -82,6 +83,15 @@ function BootSplash() {
 
 function AppRoutes() {
   const { user, loading, bootError } = useAuth();
+  const location = useLocation();
+
+  if (/^\/acompanhar\/[^/]+\/?$/.test(location.pathname)) {
+    return (
+      <Routes>
+        <Route path="/acompanhar/:tenantSlug" element={<PublicTrackerPage />} />
+      </Routes>
+    );
+  }
 
   if (loading) return <BootSplash />;
   if (bootError && !user) return <ServerUnavailable />;

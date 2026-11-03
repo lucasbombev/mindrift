@@ -269,6 +269,8 @@ exemplo, abre o mesmo fluxo do QR.
 ## 6. QR Codes e etiquetas
 
 A tela **Mais → QR Codes** (admin) mostra todos os carrinhos, agrupados por categoria.
+No topo há o **QR Code para os Pais**: gera um pôster A4 com QR grande, o endereço dinâmico
+`/acompanhar/<slug>` e o texto “Acompanhe o tempo do seu filho!”.
 
 Cada carrinho tem um `qr_token` opaco (UUID v4), independente do ID numérico. O QR aponta para:
 
@@ -420,6 +422,25 @@ servidor mostra `[push] teste manual ... enviados=... falhas=...`.
 - A aba **Em uso** agrupa o resumo de ocupação (`Pula-Pula: 3/10`) e lista uma linha por criança.
 - O push informa o nome e o equipamento da criança e abre `/em-uso?session=<id>`, destacando a sessão.
 
+## 7.5 Portal do Cliente (QR Code global)
+
+- Página pública: `/acompanhar/<tenantSlug>`.
+- Não exige login e fica fora do layout restrito.
+- Fluxo:
+  1. o pai digita o nome da criança;
+  2. vê equipamento, nome mascarado e segundos restantes;
+  3. o cronômetro atualiza sozinho a cada segundo e consulta o servidor a cada 15 s;
+  4. abaixo de 5 min fica laranja; abaixo de 1 min fica vermelho e pisca;
+  5. ao zerar, mostra “O tempo do(a) [Nome] acabou! Por favor, vá até o operador.”
+- O nome é salvo em `localStorage` por tenant para abrir direto na próxima vez.
+- Endpoint: `GET /api/public/status/:tenantSlug?name=<nome>`.
+  - normaliza maiúsculas e acentos (“joao” encontra “João”);
+  - retorna somente `estabelecimento`, `nome` mascarado, `equipamento`, `segundosRestantes` e `tempoLivre`;
+  - não retorna valor, operador, ID, telefone ou outras crianças;
+  - nomes duplicados retornam um alerta para falar com o operador;
+  - limite de **20 requisições/minuto por IP**.
+- O QR global usa `window.location.origin`, então funciona tanto no IP local quanto no domínio Tailscale.
+
 ## 8. Perfis e permissões
 
 | Ação | Superadmin | Admin do tenant | Operador |
@@ -484,10 +505,10 @@ superadmin pode criar/baixar backups no menu **Sistema**; o admin do tenant não
 npm test
 ```
 
-**39 testes** cobrem autenticação/refresh, rate limit, adiantado, renovação, encerramento, caixa, isolamento entre
+**40 testes** cobrem autenticação/refresh, rate limit, adiantado, renovação, encerramento, caixa, isolamento entre
 tenants, signup público, suspensão/bloqueio, impersonação auditada, reset/transferência de admin,
 soft/hard delete, métricas, comunicado global, categorias, planos por categoria, QR/PDF, check-in,
-destino do carrinho, telefone, preferências de som, mudança de status com `CartStatusEvent`, timer livre, inscrição push e alteração de senha auditada do superadmin.
+destino do carrinho, telefone, preferências de som, mudança de status com `CartStatusEvent`, timer livre, inscrição push, portal público seguro e alteração de senha auditada do superadmin.
 
 ### Manual no celular (via Tailscale)
 
@@ -571,6 +592,15 @@ Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no cel
 - [ ] Fechar o PWA, deixar um timer curto zerar e confirmar a notificação nativa.
 - [ ] Tocar na notificação e confirmar que abre o app em `/em-uso`, com apenas uma notificação e o alarme local tocando.
 - [ ] Desativar push e confirmar que não recebe mais; no iPhone, testar com o PWA instalado na Tela de Início.
+
+**Portal do Cliente**
+- [ ] Iniciar “Pedro” em um pula-pula e abrir `/acompanhar/<slug>` sem login.
+- [ ] Consultar “Pedro” e ver equipamento, nome mascarado e timer diminuindo.
+- [ ] Recarregar a página e confirmar que o nome salvo consulta automaticamente.
+- [ ] Testar menos de 5 min (laranja), menos de 1 min (vermelho/piscando) e tempo zerado.
+- [ ] Digitar um nome inexistente e confirmar que nenhum dado é revelado.
+- [ ] Criar dois “João” ativos e confirmar o alerta de nome duplicado.
+- [ ] Em **QR Codes**, gerar o pôster e conferir a URL dinâmica e a impressão em PDF.
 
 **Não regressões**
 - [ ] Timer continua no servidor ao fechar/abrir o app.

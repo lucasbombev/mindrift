@@ -19,6 +19,46 @@ async function makeQr(token) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[char]));
+}
+
+function printGlobalPoster(qrDataUrl, publicUrl, tenantName, openedWindow = null) {
+  const win = openedWindow || window.open('', '_blank', 'width=900,height=1200');
+  if (!win) return false;
+  win.document.write(`<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>QR Code para os Pais</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: #fff; color: #0b1220; }
+  .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 24mm 20mm; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .brand { font-size: 20px; font-weight: 900; letter-spacing: -0.04em; color: #c2410c; }
+  h1 { margin: 28mm 0 8px; font-size: 34px; line-height: 1.05; letter-spacing: -0.05em; }
+  p { margin: 0; max-width: 150mm; color: #475569; font-size: 17px; line-height: 1.5; }
+  .qr { margin: 18mm 0 12mm; width: 112mm; height: 112mm; padding: 5mm; border: 2px solid #e2e8f0; border-radius: 8mm; }
+  .qr img { width: 100%; height: 100%; display: block; }
+  .hint { font-size: 22px; font-weight: 800; color: #0b1220; }
+  .url { margin-top: 6mm; font-size: 11px; color: #64748b; word-break: break-all; }
+</style></head><body>
+<div class="page">
+  <div class="brand">Mindrift</div>
+  <h1>Acompanhe o tempo<br>do seu filho!</h1>
+  <p>Aponte a câmera do celular para o QR Code e consulte o tempo restante sem precisar chamar o operador.</p>
+  <div class="qr"><img src="${qrDataUrl}" alt="QR Code de acompanhamento"></div>
+  <div class="hint">Aponte a câmera do celular.</div>
+  <div class="url">${escapeHtml(publicUrl)}</div>
+  <p style="margin-top:auto;font-size:12px">${escapeHtml(tenantName)} · Mindrift</p>
+</div>
+</body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 400);
+  return true;
+}
+
 async function drawLabelPng(cart, tenantName) {
   const size = 600;
   const canvas = document.createElement('canvas');
@@ -66,6 +106,7 @@ export function QrCodesPage() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState('');
   const [printCart, setPrintCart] = useState(null);
+  const [globalQr, setGlobalQr] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -102,6 +143,31 @@ export function QrCodesPage() {
     setTimeout(() => window.print(), 120);
   };
 
+  const generateGlobalQr = async () => {
+    if (!user?.tenantSlug) return;
+    // Abre a janela de impressão dentro do gesto do usuário; alguns navegadores
+    // bloqueiam pop-up se ele for aberto depois de um await.
+    const win = window.open('', '_blank', 'width=900,height=1200');
+    if (!win) {
+      toast('Permita pop-ups para abrir o pôster em PDF.', { type: 'warning' });
+      return;
+    }
+    const publicUrl = `${window.location.origin}/acompanhar/${encodeURIComponent(user.tenantSlug)}`;
+    try {
+      const data = await QRCode.toDataURL(publicUrl, {
+        margin: 1,
+        width: 900,
+        errorCorrectionLevel: 'M',
+        color: { dark: '#0b1220', light: '#ffffff' },
+      });
+      setGlobalQr({ url: publicUrl, data });
+      printGlobalPoster(data, publicUrl, user.tenantName, win);
+    } catch (err) {
+      win.close();
+      toast(err.message || 'Não foi possível gerar o QR Code.', { type: 'error' });
+    }
+  };
+
   const downloadAll = async () => {
     setPdfLoading(true);
     try {
@@ -129,6 +195,26 @@ export function QrCodesPage() {
           </Button>
         }
       />
+
+      <section className="global-qr-section">
+        <div className="global-qr-section__copy">
+          <span className="eyebrow">QR Code para os Pais</span>
+          <h2>Acompanhamento sem fila</h2>
+          <p>
+            Imprima este QR Code e coloque na entrada. Os pais escaneiam, digitam o nome da
+            criança e acompanham o tempo pelo celular, sem login.
+          </p>
+          <span className="global-qr-section__url">
+            {user?.tenantSlug ? `/acompanhar/${user.tenantSlug}` : 'Configure o slug do negócio'}
+          </span>
+        </div>
+        <div className="global-qr-section__actions">
+          {globalQr ? <img src={globalQr.data} alt="QR Code global para os pais" /> : <Icon name="qr" size={48} />}
+          <Button icon="print" onClick={generateGlobalQr} disabled={!user?.tenantSlug}>
+            Gerar Pôster / QR Code Global
+          </Button>
+        </div>
+      </section>
 
       {loading ? (
         <div className="center-pad"><Spinner size={28} /></div>
