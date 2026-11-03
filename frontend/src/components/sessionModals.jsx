@@ -169,6 +169,7 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
   const touched = useRef(false);
 
   const selectedCart = carts.find((cart) => cart.id === Number(cartId));
+  const collective = (Number(selectedCart?.capacidadeMaxima) || 1) > 1;
   const availablePlans = applicablePlans(plans, selectedCart?.categoryId);
 
   useEffect(() => {
@@ -193,6 +194,7 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
     event.preventDefault();
     setError('');
     if (!cartId) return setError('Escolha um carrinho.');
+    if (collective && !cliente.trim()) return setError('Informe o nome da criança.');
     if (!result.valid) return setError('Escolha um plano válido ou informe minutos (0 = livre) e valor.');
     if (result.minutes === 0 && pagamentoAdiantado) return setError('Timer livre só pode ser pago no encerramento.');
     setLoading(true);
@@ -224,19 +226,19 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
     <Modal
       open={open}
       onClose={onClose}
-      title="Iniciar aluguel"
-      subtitle="O timer começa no servidor assim que você confirmar."
+      title={collective ? 'Adicionar criança' : 'Iniciar aluguel'}
+      subtitle={collective ? 'Cada criança tem seu próprio timer, plano e valor.' : 'O timer começa no servidor assim que você confirmar.'}
       icon="play"
       dismissible={!loading}
       footer={
         <Button type="submit" form="form-start-session" size="lg" loading={loading} icon="play" block>
           {result.valid
             ? result.minutes === 0
-              ? 'Iniciar timer livre'
+              ? collective ? 'Adicionar · timer livre' : 'Iniciar timer livre'
               : pagamentoAdiantado
-                ? `Iniciar e receber · ${brl(result.cents)}`
-                : `Iniciar · ${brl(result.cents)}`
-            : 'Iniciar aluguel'}
+                ? `${collective ? 'Adicionar' : 'Iniciar'} e receber · ${brl(result.cents)}`
+                : `${collective ? 'Adicionar' : 'Iniciar'} · ${brl(result.cents)}`
+            : collective ? 'Adicionar criança' : 'Iniciar aluguel'}
         </Button>
       }
     >
@@ -257,21 +259,27 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
               >
                 <span className="cart-chip__dot" />
                 <strong>{cart.codigo}</strong>
-                <small>{cart.category?.icone} {cart.category?.nome}</small>
+                <small>{cart.category?.icone} {cart.category?.nome}{cart.capacidadeMaxima > 1 ? ` · ${cart.ocupacaoAtual || 0}/${cart.capacidadeMaxima}` : ''}</small>
               </button>
             ))}
           </div>
         </Field>
 
-        <Field label="Nome do cliente (opcional)" htmlFor="cliente" hint="Pode iniciar sem nome e preencher depois no histórico.">
+        <Field
+          label={collective ? 'Nome da criança' : 'Nome do cliente (opcional)'}
+          htmlFor="cliente"
+          required={collective}
+          hint={collective ? 'Obrigatório para identificar a sessão individual no equipamento coletivo.' : 'Pode iniciar sem nome e preencher depois no histórico.'}
+        >
           <Input
             id="cliente"
             value={cliente}
             onChange={(event) => setCliente(event.target.value)}
-            placeholder="Ex.: João (ou deixe em branco)"
+            placeholder={collective ? 'Ex.: João' : 'Ex.: João (ou deixe em branco)'}
             maxLength={80}
             autoComplete="off"
             disabled={loading}
+            required={collective}
           />
         </Field>
 

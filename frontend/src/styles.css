@@ -6558,3 +6558,124 @@ body:has(.bottom-nav) .pwa-update-banner {
   flex-direction: column;
   gap: 6px;
 }
+
+/* Ocupação coletiva / destaque da sessão */
+.active-occupancy-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0 0 12px;
+}
+.active-occupancy {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text);
+  font-size: 11.5px;
+}
+.active-occupancy span { color: var(--muted); font-weight: 700; }
+.active-occupancy strong { font-size: 11.5px; }
+.active-occupancy.is-full {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+.active-session-card.is-highlighted {
+  outline: 3px solid var(--orange);
+  outline-offset: 2px;
+}
+
+/* Equipamentos coletivos */
+.cart-card--full { border-color: #fca5a5; }
+.cart-status--full { background: #991b1b; color: #fff; }
+.cart-card__occupancy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-2);
+}
+.cart-card__occupancy-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.cart-card__occupancy-head strong {
+  color: var(--text);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.cart-card__occupancy-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--line);
+}
+.cart-card__occupancy-bar span {
+  display: block;
+  height: 100%;
+  background: var(--orange);
+  border-radius: inherit;
+}
+.cart-card__children {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.cart-card__child {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+  font-size: 11px;
+}
+.cart-card__child strong {
+  max-width: 95px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cart-card__child em {
+  color: var(--muted);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+.cart-card__child-more {
+  align-self: center;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.scan-session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.scan-session-list__item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-2);
+  font-size: 12px;
+}
+.scan-session-list__item span {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

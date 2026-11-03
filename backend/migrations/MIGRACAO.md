@@ -150,3 +150,12 @@ verdade do toggle; `push_enabled` registra a preferência do usuário
 (`Agora não` = 0, inscrição = 1).
 
 Schema de referência: [`005_push_enabled.sql`](./005_push_enabled.sql).
+
+## Migração 006 (v8) — equipamentos coletivos
+
+Adiciona `carts.capacidade_maxima` (default `1`), remove o índice único que
+impedia duas sessões ativas no mesmo carrinho e cria um índice não único para
+consultas de ocupação. O status `lotado` é calculado pela API a partir de
+`count(sessões ativas) >= capacidade_maxima`; ele não é gravado no banco.
+
+Schema de referência: [`006_capacidade_coletiva.sql`](./006_capacidade_coletiva.sql).

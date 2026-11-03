@@ -8,6 +8,7 @@ import { listCartStatusEvents, logCartStatus } from '../services/cartStatus.js';
 import { badRequest, conflict, forbidden, notFound } from '../utils/errors.js';
 import { nowIso } from '../utils/time.js';
 import { serializeCart } from '../services/dashboard.js';
+import { activeSessionCountForCart, activeSessionsForCart } from '../services/cartCapacity.js';
 
 const STATUSES = ['disponivel', 'carregando', 'manutencao'];
 
@@ -23,6 +24,7 @@ const createSchema = z.object({
   codigo: codigoSchema,
   category_id: z.coerce.number().int().positive('Escolha a categoria.'),
   status: z.enum(STATUSES).optional(),
+  capacidade_maxima: z.coerce.number().int().min(1).max(100).optional().default(1),
   observacao: z.string().trim().max(200).optional(),
 });
 
@@ -30,6 +32,7 @@ const updateSchema = z.object({
   codigo: codigoSchema.optional(),
   category_id: z.coerce.number().int().positive().optional(),
   status: z.enum(STATUSES).optional(),
+  capacidade_maxima: z.coerce.number().int().min(1).max(100).optional(),
   observacao: z.string().trim().max(200).nullable().optional(),
   remove_foto: z.enum(['0', '1']).optional(),
 });
@@ -52,15 +55,6 @@ const CART_SELECT = `
   FROM carts c
   JOIN categories cat ON cat.id = c.category_id
 `;
-
-function activeSessionForCart(db, tenantId, cartId) {
-  return db
-    .prepare(
-      `SELECT id, cliente_nome FROM sessions
-       WHERE tenant_id = ? AND cart_id = ? AND status = 'em_andamento' AND excluida_em IS NULL`,
-    )
-    .get(tenantId, cartId);
-}
 
 function getCart(db, tenantId, id) {
   return db
@@ -90,21 +84,25 @@ export function createCartsRouter(db) {
          WHERE tenant_id = ? AND status = 'em_andamento' AND excluida_em IS NULL`,
       )
       .all(req.tenantId);
-    const byCart = new Map(active.map((session) => [session.cart_id, session]));
+    const byCart = new Map();
+    for (const session of active) {
+      if (!byCart.has(session.cart_id)) byCart.set(session.cart_id, []);
+      byCart.get(session.cart_id).push(session);
+    }
+    const sessionDto = (session) => ({
+      id: session.id,
+      clienteNome: session.cliente_nome,
+      fimPrevistoEm: session.fim_previsto_em,
+      valorCentavos: session.valor_centavos,
+    });
     res.json({
       items: rows.map((row) => {
-        const session = byCart.get(row.id);
+        const sessions = byCart.get(row.id) || [];
         return {
-          ...serializeCart(row),
+          ...serializeCart(row, sessions.length),
           excluidoEm: row.excluido_em || null,
-          sessaoAtiva: session
-            ? {
-                id: session.id,
-                clienteNome: session.cliente_nome,
-                fimPrevistoEm: session.fim_previsto_em,
-                valorCentavos: session.valor_centavos,
-              }
-            : null,
+          sessaoAtiva: sessions.length ? sessionDto(sessions[0]) : null,
+          sessoesAtivas: sessions.map(sessionDto),
         };
       }),
     });
@@ -128,8 +126,8 @@ export function createCartsRouter(db) {
       const info = db
         .prepare(
           `INSERT INTO carts
-            (tenant_id, category_id, codigo, qr_token, foto_url, status, observacao, criado_em, atualizado_em)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (tenant_id, category_id, codigo, qr_token, foto_url, capacidade_maxima, status, observacao, criado_em, atualizado_em)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           req.tenantId,
@@ -137,6 +135,7 @@ export function createCartsRouter(db) {
           body.codigo,
           crypto.randomUUID(),
           optionalPhoto(req),
+          body.capacidade_maxima || 1,
           body.status || 'disponivel',
           body.observacao || null,
           now,
@@ -144,7 +143,7 @@ export function createCartsRouter(db) {
         );
       const row = getCart(db, req.tenantId, Number(info.lastInsertRowid));
       req.app.locals.broadcast?.(req.tenantId);
-      res.status(201).json({ item: serializeCart(row) });
+      res.status(201).json({ item: serializeCart(row, 0) });
     } catch (err) {
       if (req.file) removeUploadedByUrl(uploadedPhotoUrl(req.file));
       next(err);
@@ -158,9 +157,9 @@ export function createCartsRouter(db) {
       if (!row) throw notFound('Carrinho não encontrado.');
       validateUploadedPhoto(req.file);
       const body = updateSchema.parse(req.body);
-      const active = activeSessionForCart(db, req.tenantId, id);
+      const activeCount = activeSessionCountForCart(db, req.tenantId, id);
 
-      if (body.status && body.status !== row.status && active) {
+      if (body.status && body.status !== row.status && activeCount > 0) {
         throw conflict('Não altere o status de um carrinho com sessão em andamento.');
       }
       if (body.codigo && body.codigo !== row.codigo) {
@@ -178,9 +177,13 @@ export function createCartsRouter(db) {
         if (changedCategory && !category.ativo) {
           throw badRequest('Escolha uma categoria ativa.');
         }
-        if (active && changedCategory) {
+        if (activeCount > 0 && changedCategory) {
           throw conflict('Não altere a categoria de um carrinho com sessão em andamento.');
         }
+      }
+
+      if (body.capacidade_maxima !== undefined && body.capacidade_maxima < activeCount) {
+        throw conflict(`Há ${activeCount} sessão(ões) ativa(s); a capacidade não pode ser menor.`);
       }
 
       const fields = [];
@@ -192,6 +195,10 @@ export function createCartsRouter(db) {
       if (body.category_id !== undefined) {
         fields.push('category_id = ?');
         params.push(body.category_id);
+      }
+      if (body.capacidade_maxima !== undefined) {
+        fields.push('capacidade_maxima = ?');
+        params.push(body.capacidade_maxima);
       }
       if (body.status !== undefined) {
         fields.push('status = ?');
@@ -224,7 +231,7 @@ export function createCartsRouter(db) {
       if (oldPhotoToRemove) removeUploadedByUrl(oldPhotoToRemove);
       const fresh = getCart(db, req.tenantId, id);
       req.app.locals.broadcast?.(req.tenantId);
-      res.json({ item: serializeCart(fresh) });
+      res.json({ item: serializeCart(fresh, activeCount) });
     } catch (err) {
       if (req.file) removeUploadedByUrl(uploadedPhotoUrl(req.file));
       next(err);
@@ -237,15 +244,15 @@ export function createCartsRouter(db) {
       const id = Number(req.params.id);
       const row = getCart(db, req.tenantId, id);
       if (!row) throw notFound('Carrinho não encontrado.');
-      if (activeSessionForCart(db, req.tenantId, id)) {
-        throw conflict('Encerre a sessão ativa antes de fazer check-in.');
+      if (activeSessionCountForCart(db, req.tenantId, id) > 0) {
+        throw conflict('Encerre as sessões ativas antes de fazer check-in.');
       }
       const body = checkinSchema.parse(req.body || {});
       if (row.status === 'manutencao' && req.user.role !== 'admin') {
         throw forbidden('Apenas administradores liberam carrinho da manutenção.');
       }
       if (row.status === 'em_uso') {
-        throw conflict('Carrinho está em uso. Encerre a sessão primeiro.');
+        throw conflict('Carrinho está em uso. Encerre as sessões ativas primeiro.');
       }
       if (row.status === 'disponivel') {
         return res.json({ item: serializeCart(row), mensagem: 'Carrinho já está disponível.' });
@@ -282,9 +289,13 @@ export function createCartsRouter(db) {
       const id = Number(req.params.id);
       const row = getCart(db, req.tenantId, id);
       if (!row) throw notFound('Carrinho não encontrado.');
-      const active = activeSessionForCart(db, req.tenantId, id);
-      if (active || row.status === 'em_uso') {
-        throw conflict('Encerre a sessão primeiro.', 'carrinho_em_uso');
+      const activeCount = activeSessionCountForCart(db, req.tenantId, id);
+      if (activeCount > 0 || row.status === 'em_uso') {
+        const singular = activeCount === 1 && (Number(row.capacidade_maxima) || 1) === 1;
+        throw conflict(
+          singular ? 'Encerre a sessão primeiro.' : 'Encerre as sessões ativas primeiro.',
+          'carrinho_em_uso',
+        );
       }
       const body = statusSchema.parse(req.body);
       if (body.status === row.status) {
@@ -330,8 +341,8 @@ export function createCartsRouter(db) {
       const id = Number(req.params.id);
       const row = getCart(db, req.tenantId, id);
       if (!row) throw notFound('Carrinho não encontrado.');
-      if (activeSessionForCart(db, req.tenantId, id)) {
-        throw conflict('Encerre ou cancele a sessão antes de excluir o carrinho.');
+      if (activeSessionCountForCart(db, req.tenantId, id) > 0) {
+        throw conflict('Encerre ou cancele as sessões ativas antes de excluir o carrinho.');
       }
       const now = nowIso();
       db.prepare(

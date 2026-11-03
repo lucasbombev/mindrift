@@ -37,6 +37,7 @@ function CartFormModal({ cart, categories, onClose, onSaved }) {
     cart?.status === 'em_uso' ? 'disponivel' : cart?.status || 'disponivel',
   );
   const [observacao, setObservacao] = useState(cart?.observacao || '');
+  const [capacidade, setCapacidade] = useState(cart?.capacidadeMaxima || 1);
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(cart?.fotoUrl || '');
   const [objectUrl, setObjectUrl] = useState('');
@@ -92,6 +93,7 @@ function CartFormModal({ cart, categories, onClose, onSaved }) {
       formData.append('category_id', String(categoryId));
       if (!active) formData.append('status', status);
       formData.append('observacao', observacao.trim());
+      formData.append('capacidade_maxima', String(capacidade));
       if (file) formData.append('foto', file);
       if (removePhoto) formData.append('remove_foto', '1');
       const data = isEdit
@@ -199,6 +201,23 @@ function CartFormModal({ cart, categories, onClose, onSaved }) {
           </Field>
         </div>
         <Field
+          label="Capacidade máxima"
+          htmlFor="cart-capacidade"
+          hint="Use 1 para carrinhos de drift. Use 10, por exemplo, para pula-pula/infláveis."
+          required
+        >
+          <Input
+            id="cart-capacidade"
+            type="number"
+            min="1"
+            max="100"
+            value={capacidade}
+            onChange={(event) => setCapacidade(event.target.value)}
+            disabled={loading || active}
+          />
+        </Field>
+
+        <Field
           label="Status"
           htmlFor="cart-status"
           hint={active ? 'Em uso até a sessão terminar.' : 'O início do aluguel muda para em uso.'}
@@ -301,7 +320,7 @@ export function CartsPage() {
     () => ({
       total: carts.length,
       available: carts.filter((cart) => cart.status === 'disponivel').length,
-      inUse: carts.filter((cart) => cart.status === 'em_uso').length,
+      inUse: carts.filter((cart) => cart.status === 'em_uso' || cart.status === 'lotado').length,
     }),
     [carts],
   );
@@ -362,7 +381,7 @@ export function CartsPage() {
                     <div>
                       <h2>{cart.codigo}</h2>
                       <span className="admin-cart__category" style={{ '--category-color': cart.category?.cor }}>
-                        {cart.category?.icone} {cart.category?.nome || 'Sem categoria'} ·{' '}
+                        {cart.category?.icone} {cart.category?.nome || 'Sem categoria'} · cap. {cart.capacidadeMaxima || 1} ·{' '}
                         {STATUS_OPTIONS.find((item) => item.value === cart.status)?.label || statusLabel(cart.status)}
                       </span>
                     </div>
@@ -383,8 +402,19 @@ export function CartsPage() {
 
                   {active ? (
                     <div className="admin-cart__active">
-                      <Badge tone="blue">Em uso por {clientName(cart.sessaoAtiva.clienteNome)}</Badge>
-                      <span>{cart.sessaoAtiva.fimPrevistoEm ? `Termina às ${formatTime(cart.sessaoAtiva.fimPrevistoEm)}` : 'Timer livre em andamento'}</span>
+                      {cart.capacidadeMaxima > 1 ? (
+                        <>
+                          <Badge tone={cart.status === 'lotado' ? 'red' : 'blue'}>
+                            Ocupação {cart.ocupacaoAtual || 0}/{cart.capacidadeMaxima}
+                          </Badge>
+                          <span>{cart.sessoesAtivas?.length || 1} sessão(ões) ativa(s)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Badge tone="blue">Em uso por {clientName(cart.sessaoAtiva.clienteNome)}</Badge>
+                          <span>{cart.sessaoAtiva.fimPrevistoEm ? `Termina às ${formatTime(cart.sessaoAtiva.fimPrevistoEm)}` : 'Timer livre em andamento'}</span>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <div className="admin-cart__quick">

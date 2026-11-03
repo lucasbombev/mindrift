@@ -92,6 +92,10 @@ function ScanResult({ token, onScanAnother }) {
 
   if (!data) return null;
   const { cart, activeSession } = data;
+  const activeSessions = data.sessoesAtivas || (activeSession ? [activeSession] : []);
+  const capacity = Number(cart.capacidadeMaxima) || 1;
+  const collective = capacity > 1;
+  const occupancy = Number(cart.ocupacaoAtual ?? activeSessions.length) || 0;
   const openTimer = Boolean(activeSession && !activeSession.fimPrevistoEm);
   const remaining = activeSession && !openTimer
     ? new Date(activeSession.fimPrevistoEm).getTime() - now
@@ -127,7 +131,7 @@ function ScanResult({ token, onScanAnother }) {
         </div>
       </div>
 
-      {cart.status === 'disponivel' && !activeSession && (
+      {cart.status === 'disponivel' && !activeSession && !collective && (
         <section className="scan-action-card">
           <div className="scan-action-card__head">
             <span className="scan-action-card__icon is-ready"><Icon name="play" size={28} /></span>
@@ -142,7 +146,43 @@ function ScanResult({ token, onScanAnother }) {
         </section>
       )}
 
-      {activeSession && (
+      {collective && ['disponivel', 'em_uso', 'lotado'].includes(cart.status) && (
+        <section className="scan-action-card">
+          <div className="scan-action-card__head">
+            <span className="scan-action-card__icon is-ready"><Icon name="cart" size={28} /></span>
+            <div>
+              <h2>{cart.codigo} · {occupancy}/{capacity} ocupados</h2>
+              <p>Cada criança tem timer, plano e encerramento individual.</p>
+            </div>
+          </div>
+          {activeSessions.length > 0 && (
+            <div className="scan-session-list">
+              {activeSessions.map((item) => (
+                <div key={item.id} className="scan-session-list__item">
+                  <strong>{clientName(item.clienteNome)}</strong>
+                  <span>
+                    {item.fimPrevistoEm
+                      ? `${formatCountdown(new Date(item.fimPrevistoEm).getTime() - now).text} restantes`
+                      : `${formatElapsed(now - new Date(item.iniciadoEm).getTime())} decorrido`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {occupancy >= capacity ? (
+            <InfoNote tone="warning" icon="lock">Equipamento lotado. Aguarde uma saída.</InfoNote>
+          ) : (
+            <Button size="lg" icon="plus" block onClick={() => setModal({ type: 'start' })}>
+              Adicionar Criança
+            </Button>
+          )}
+          <Button variant="secondary" icon="timer" block onClick={() => window.location.assign('/em-uso')}>
+            Gerenciar em “Em uso”
+          </Button>
+        </section>
+      )}
+
+      {activeSession && !collective && (
         <section className="scan-action-card">
           <div className="scan-session-head">
             <div>
@@ -210,7 +250,7 @@ function ScanResult({ token, onScanAnother }) {
         </section>
       )}
 
-      {cart.status === 'em_uso' && !activeSession && (
+      {cart.status === 'em_uso' && !activeSession && !collective && (
         <InfoNote tone="warning" icon="alert">
           O carrinho está marcado como em uso, mas não há sessão ativa. Peça ao administrador para
           ajustar o status.

@@ -130,9 +130,11 @@ const expireCheck = setInterval(() => {
     active = db
       .prepare(
         `SELECT s.id, s.tenant_id, s.fim_previsto_em, s.cliente_nome,
-                c.codigo AS cart_codigo, t.ativo AS tenant_ativo
+                c.codigo AS cart_codigo, cat.nome AS cart_category_nome,
+                t.ativo AS tenant_ativo
          FROM sessions s
          JOIN carts c ON c.id = s.cart_id
+         JOIN categories cat ON cat.id = c.category_id
          JOIN tenants t ON t.id = s.tenant_id
          WHERE s.status = 'em_andamento' AND s.excluida_em IS NULL
            AND s.fim_previsto_em IS NOT NULL`,
@@ -174,8 +176,8 @@ const expireCheck = setInterval(() => {
         : 'alarme';
       const pushPayload = {
         title: 'Tempo esgotado!',
-        body: `O aluguel do veículo ${session.cart_codigo} terminou.`,
-        url: '/em-uso',
+        body: `O tempo de ${session.cliente_nome || 'cliente'} no ${session.cart_category_nome || session.cart_codigo} acabou!`,
+        url: `/em-uso?session=${session.id}`,
         som: `/sounds/${somValido}.wav`,
         tag: `mindrift-expired-${session.id}-${session.fim_previsto_em}`,
       };

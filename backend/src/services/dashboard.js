@@ -2,14 +2,22 @@ import { dayBounds } from '../utils/time.js';
 import { getSetting } from '../db.js';
 import { buildReceipts, filterReceipts, sessionAmounts } from './payments.js';
 import { serializeCategory } from './categories.js';
+import { cartCapacity, computedCartStatus } from './cartCapacity.js';
 
-export function serializeCart(row) {
+export function serializeCart(row, activeCount = 0) {
+  const count = Number(row.ocupacao_atual ?? activeCount) || 0;
+  const capacity = cartCapacity(row);
+  const status = computedCartStatus(row, count);
   return {
     id: row.id,
     codigo: row.codigo,
     qrToken: row.qr_token || null,
     fotoUrl: row.foto_url || null,
-    status: row.status,
+    status,
+    statusOperacional: row.status,
+    capacidadeMaxima: capacity,
+    ocupacaoAtual: count,
+    vagasDisponiveis: Math.max(0, capacity - count),
     observacao: row.observacao || null,
     categoryId: row.category_id ?? null,
     category: row.category_nome
@@ -51,12 +59,12 @@ export function getDashboard(db, tenantId) {
        WHERE c.tenant_id = ? AND c.excluido_em IS NULL
        ORDER BY cat.nome COLLATE NOCASE, c.codigo COLLATE NOCASE`,
     )
-    .all(tenantId)
-    .map(serializeCart);
+    .all(tenantId);
 
   const activeRows = db
     .prepare(
       `SELECT s.*, c.codigo AS cart_codigo, c.category_id AS cart_category_id,
+              c.capacidade_maxima AS cart_capacidade_maxima,
               cat.nome AS cart_category_nome, cat.icone AS cart_category_icone,
               cat.cor AS cart_category_cor, u.nome AS operador_nome
        FROM sessions s
@@ -68,7 +76,14 @@ export function getDashboard(db, tenantId) {
     )
     .all(tenantId);
 
-  const activeByCart = new Map(activeRows.map((row) => [row.cart_id, row]));
+  const activeByCart = new Map();
+  for (const row of activeRows) {
+    if (!activeByCart.has(row.cart_id)) activeByCart.set(row.cart_id, []);
+    activeByCart.get(row.cart_id).push(row);
+  }
+  const activeCountByCart = new Map(
+    [...activeByCart.entries()].map(([cartId, rows]) => [cartId, rows.length]),
+  );
 
   const activeSessionDto = (row) => {
     const amounts = sessionAmounts(row);
@@ -80,6 +95,8 @@ export function getDashboard(db, tenantId) {
       cartCategoryNome: row.cart_category_nome || null,
       cartCategoryIcone: row.cart_category_icone || null,
       cartCategoryCor: row.cart_category_cor || null,
+      cartCapacidadeMaxima: Number(row.cart_capacidade_maxima) || 1,
+      cartOcupacaoAtual: activeCountByCart.get(row.cart_id) || 0,
       clienteNome: row.cliente_nome || null,
       planoNome: row.plano_nome,
       minutosContratados: row.minutos_contratados,
@@ -102,10 +119,12 @@ export function getDashboard(db, tenantId) {
   const activeSessions = activeRows.map(activeSessionDto);
 
   const cartsWithSessions = carts.map((cart) => {
-    const active = activeByCart.get(cart.id) || null;
+    const activeList = activeByCart.get(cart.id) || [];
+    const serialized = serializeCart(cart, activeList.length);
     return {
-      ...cart,
-      sessaoAtiva: active ? activeSessionDto(active) : null,
+      ...serialized,
+      sessaoAtiva: activeList.length ? activeSessionDto(activeList[0]) : null,
+      sessoesAtivas: activeList.map(activeSessionDto),
     };
   });
 
@@ -150,12 +169,12 @@ export function getDashboard(db, tenantId) {
     )
     .get(tenantId, start, end).qtd;
 
-  const byStatus = carts.reduce(
+  const byStatus = cartsWithSessions.reduce(
     (acc, cart) => {
       acc[cart.status] = (acc[cart.status] || 0) + 1;
       return acc;
     },
-    { disponivel: 0, em_uso: 0, carregando: 0, manutencao: 0 },
+    { disponivel: 0, em_uso: 0, lotado: 0, carregando: 0, manutencao: 0 },
   );
 
   return {
@@ -169,7 +188,9 @@ export function getDashboard(db, tenantId) {
     summary: {
       totalCarrinhos: carts.length,
       emUso: activeSessions.length,
+      equipamentosEmUso: cartsWithSessions.filter((cart) => cart.status === 'em_uso' || cart.status === 'lotado').length,
       disponiveis: byStatus.disponivel,
+      lotados: byStatus.lotado,
       carregando: byStatus.carregando,
       manutencao: byStatus.manutencao,
       faturamentoHojeCentavos: revenue.total,

@@ -24,7 +24,7 @@ import {
 import { Icon } from '../components/Icons.jsx';
 
 const FILTER_STORAGE_PREFIX = 'mindrift.dashboard.filters.';
-const STATUS_FILTERS = ['all', 'disponivel', 'em_uso', 'carregando', 'manutencao'];
+const STATUS_FILTERS = ['all', 'disponivel', 'em_uso', 'lotado', 'carregando', 'manutencao'];
 
 function readSavedFilters(userId) {
   if (!userId) return { categoryFilter: 'all', statusFilter: 'all' };
@@ -188,7 +188,9 @@ export function DashboardPage() {
 
   if (!data) return null;
 
-  const availableCarts = data.carts.filter((cart) => cart.status === 'disponivel');
+  const startableCarts = data.carts.filter(
+    (cart) => cart.status === 'disponivel' || (cart.capacidadeMaxima > 1 && cart.status === 'em_uso'),
+  );
   const summary = data.summary;
   const finiteActive = data.sessoesAtivas.filter((session) => session.fimPrevistoEm);
   const nextEnd = finiteActive.sort((a, b) => new Date(a.fimPrevistoEm) - new Date(b.fimPrevistoEm))[0];
@@ -201,6 +203,7 @@ export function DashboardPage() {
     { value: 'all', label: 'Todos' },
     { value: 'disponivel', label: 'Disponível' },
     { value: 'em_uso', label: 'Em uso' },
+    { value: 'lotado', label: 'Lotado' },
     { value: 'carregando', label: 'Carregando' },
     { value: 'manutencao', label: 'Manutenção' },
   ];
@@ -236,8 +239,8 @@ export function DashboardPage() {
             icon="play"
             size="sm"
             className="dashboard-hero__start"
-            onClick={() => availableCarts[0] && setModal({ type: 'start', cart: availableCarts[0] })}
-            disabled={!availableCarts.length}
+            onClick={() => startableCarts[0] && setModal({ type: 'start', cart: startableCarts[0] })}
+            disabled={!startableCarts.length}
           >
             Novo aluguel
           </Button>
@@ -430,7 +433,7 @@ export function DashboardPage() {
         <StartSessionModal
           open
           onClose={() => setModal(null)}
-          carts={availableCarts}
+          carts={startableCarts}
           preselectedCart={modal.cart}
           onSuccess={refreshAfterAction}
         />

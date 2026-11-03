@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS carts (
   codigo TEXT NOT NULL COLLATE NOCASE,
   qr_token TEXT NOT NULL,
   foto_url TEXT,
+  capacidade_maxima INTEGER NOT NULL DEFAULT 1 CHECK (capacidade_maxima >= 1),
   status TEXT NOT NULL DEFAULT 'disponivel'
     CHECK (status IN ('disponivel', 'em_uso', 'carregando', 'manutencao')),
   observacao TEXT,
@@ -234,8 +235,8 @@ CREATE INDEX IF NOT EXISTS idx_carts_category ON carts(category_id);
 CREATE INDEX IF NOT EXISTS idx_plans_tenant ON pricing_plans(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_plans_category ON pricing_plans(category_id);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_uma_ativa_por_carrinho
-  ON sessions(cart_id) WHERE status = 'em_andamento' AND excluida_em IS NULL;
+CREATE INDEX IF NOT EXISTS idx_sessions_ativa_por_carrinho
+  ON sessions(cart_id, status) WHERE status = 'em_andamento' AND excluida_em IS NULL;
 CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status, iniciado_em);
 CREATE INDEX IF NOT EXISTS idx_sessions_cart ON sessions(cart_id);
@@ -591,6 +592,21 @@ function migrateV7(db, { makeBackup = true } = {}) {
   db.pragma('user_version = 7');
 }
 
+
+/** v8 — capacidade coletiva por equipamento (1 = individual, >1 = pula-pula). */
+function migrateV8(db, { makeBackup = true } = {}) {
+  const cols = tableColumns(db, 'carts');
+  if (!cols.has('capacidade_maxima')) {
+    if (makeBackup && tableExists(db, 'carts')) createMigrationBackup(db);
+    db.exec('ALTER TABLE carts ADD COLUMN capacidade_maxima INTEGER NOT NULL DEFAULT 1');
+  }
+  db.exec('DROP INDEX IF EXISTS idx_sessions_uma_ativa_por_carrinho');
+  db.exec(SCHEMA_TABLES);
+  db.exec(SCHEMA_INDEXES);
+  db.prepare('INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (8, ?)').run(nowIso());
+  db.pragma('user_version = 8');
+}
+
 export function ensureDefaultTenant(db) {
   let tenant = db.prepare("SELECT * FROM tenants WHERE slug = 'default'").get();
   if (!tenant) {
@@ -624,6 +640,7 @@ export function openDb(filePath = config.dbPath) {
     migrateV5(db, { makeBackup: usersExist });
     migrateV6(db, { makeBackup: usersExist });
     migrateV7(db, { makeBackup: usersExist });
+    migrateV8(db, { makeBackup: usersExist });
     ensureDefaultTenant(db);
   } else {
     migrateLegacy(db);
@@ -632,6 +649,7 @@ export function openDb(filePath = config.dbPath) {
     migrateV5(db, { makeBackup: false });
     migrateV6(db, { makeBackup: false });
     migrateV7(db, { makeBackup: false });
+    migrateV8(db, { makeBackup: false });
   }
 
   return db;

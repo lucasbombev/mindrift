@@ -3,10 +3,16 @@ import { addMinutes, nowIso } from '../utils/time.js';
 import { logEvent } from './audit.js';
 import { sessionAmounts } from './payments.js';
 import { logCartStatus } from './cartStatus.js';
+import { cartCapacity, computedCartStatus } from './cartCapacity.js';
 
 export const SESSION_SELECT = `
   SELECT s.*, c.codigo AS cart_codigo, c.foto_url AS cart_foto_url,
-         c.category_id AS cart_category_id, cat.nome AS cart_category_nome,
+         c.category_id AS cart_category_id,
+         c.capacidade_maxima AS cart_capacidade_maxima,
+         (SELECT COUNT(*) FROM sessions s2
+          WHERE s2.tenant_id = s.tenant_id AND s2.cart_id = s.cart_id
+            AND s2.status = 'em_andamento' AND s2.excluida_em IS NULL) AS cart_ocupacao_atual,
+         cat.nome AS cart_category_nome,
          cat.icone AS cart_category_icone, cat.cor AS cart_category_cor,
          u.nome AS operador_nome
   FROM sessions s
@@ -30,6 +36,8 @@ export function serializeSession(row) {
     cartCategoryNome: row.cart_category_nome || null,
     cartCategoryIcone: row.cart_category_icone || null,
     cartCategoryCor: row.cart_category_cor || null,
+    cartCapacidadeMaxima: Number(row.cart_capacidade_maxima) || 1,
+    cartOcupacaoAtual: Number(row.cart_ocupacao_atual) || 0,
     clienteNome: row.cliente_nome || null,
     planoId: row.plano_id,
     planoNome: row.plano_nome,
@@ -125,21 +133,33 @@ export function startSession(db, tenantId, input, operator) {
       .get(input.cart_id, tenantId);
     if (!cart) throw notFound('Carrinho não encontrado.');
     if (!cart.category_ativa) throw badRequest('A categoria deste carrinho está inativa.');
-    if (cart.status !== 'disponivel') {
+    const capacity = cartCapacity(cart);
+    const activeCount = db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM sessions
+         WHERE tenant_id = ? AND cart_id = ?
+           AND status = 'em_andamento' AND excluida_em IS NULL`,
+      )
+      .get(tenantId, cart.id).n;
+    if (cart.status === 'carregando' || cart.status === 'manutencao') {
       throw conflict(
-        cart.status === 'em_uso'
-          ? 'Este carrinho já está em uso.'
-          : 'Carrinho indisponível. Altere o status para "disponível" antes de iniciar.',
+        'Carrinho indisponível. Altere o status para "disponível" antes de iniciar.',
         'carrinho_indisponivel',
       );
     }
-    const active = db
-      .prepare(
-        `SELECT id FROM sessions WHERE tenant_id = ? AND cart_id = ?
-         AND status = 'em_andamento' AND excluida_em IS NULL`,
-      )
-      .get(tenantId, cart.id);
-    if (active) throw conflict('Este carrinho já possui uma sessão ativa.', 'carrinho_em_uso');
+    if (activeCount >= capacity) {
+      if (capacity === 1) {
+        throw conflict('Este carrinho já está em uso.', 'carrinho_indisponivel');
+      }
+      throw conflict(
+        'Equipamento lotado. Aguarde uma saída para adicionar outra criança.',
+        'equipamento_lotado',
+      );
+    }
+    const cliente = normalizeClientName(input.cliente_nome);
+    if (capacity > 1 && !cliente) {
+      throw badRequest('Informe o nome da criança para identificar a sessão.');
+    }
 
     const pricing = resolvePricing(db, tenantId, input, cart.category_id);
     if (pricing.minutos === 0 && adiantado) {
@@ -150,7 +170,6 @@ export function startSession(db, tenantId, input, operator) {
     const endsAt = pricing.minutos > 0 ? addMinutes(startedAt, pricing.minutos) : null;
     const now = nowIso();
     const forma = adiantado ? input.forma_pagamento : null;
-    const cliente = normalizeClientName(input.cliente_nome);
 
     const info = db
       .prepare(
@@ -185,10 +204,13 @@ export function startSession(db, tenantId, input, operator) {
       );
     const sessionId = Number(info.lastInsertRowid);
 
+    const previousStatus = computedCartStatus(cart, activeCount);
     db.prepare(
       "UPDATE carts SET status = 'em_uso', atualizado_em = ? WHERE id = ? AND tenant_id = ?",
     ).run(now, cart.id, tenantId);
-    logCartStatus(db, tenantId, cart.id, 'disponivel', 'em_uso', 'inicio_aluguel', null, operator.id);
+    if (previousStatus !== 'em_uso') {
+      logCartStatus(db, tenantId, cart.id, previousStatus, 'em_uso', 'inicio_aluguel', null, operator.id);
+    }
 
     logEvent(db, tenantId, sessionId, 'inicio', operator.id, {
       carrinho: cart.codigo,
@@ -346,10 +368,32 @@ export function endSession(db, tenantId, id, input, operator) {
       });
     }
 
-    db.prepare(
-      'UPDATE carts SET status = ?, atualizado_em = ? WHERE id = ? AND tenant_id = ?',
-    ).run(cartDestino, now, row.cart_id, tenantId);
-    logCartStatus(db, tenantId, row.cart_id, 'em_uso', cartDestino, 'destino_encerramento', null, operator.id);
+    const cart = db
+      .prepare('SELECT status, capacidade_maxima FROM carts WHERE id = ? AND tenant_id = ?')
+      .get(row.cart_id, tenantId);
+    const remaining = db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM sessions
+         WHERE tenant_id = ? AND cart_id = ?
+           AND status = 'em_andamento' AND excluida_em IS NULL`,
+      )
+      .get(tenantId, row.cart_id).n;
+    const nextCartStatus = remaining > 0 ? 'em_uso' : cartDestino;
+    if (cart?.status !== nextCartStatus) {
+      db.prepare(
+        'UPDATE carts SET status = ?, atualizado_em = ? WHERE id = ? AND tenant_id = ?',
+      ).run(nextCartStatus, now, row.cart_id, tenantId);
+      logCartStatus(
+        db,
+        tenantId,
+        row.cart_id,
+        cart?.status || 'em_uso',
+        nextCartStatus,
+        remaining > 0 ? 'saida_com_outras_sessoes' : 'destino_encerramento',
+        null,
+        operator.id,
+      );
+    }
 
     logEvent(db, tenantId, id, 'encerramento', operator.id, {
       encerradoEm: endedIso,
@@ -359,7 +403,7 @@ export function endSession(db, tenantId, id, input, operator) {
       valorRestanteCentavos: restante,
       pago: Boolean(nextPago),
       formaPagamento: nextForma,
-      destinoCarrinho: cartDestino,
+      destinoCarrinho: remaining > 0 ? 'em_uso' : cartDestino,
     });
     if (hasFinalPayment) {
       logEvent(db, tenantId, id, 'pagamento', operator.id, {
@@ -524,10 +568,18 @@ export function cancelSession(db, tenantId, id, input, operator) {
        forma_pagamento = NULL, pago_em = NULL WHERE id = ? AND tenant_id = ?`,
     ).run(motivo, endedAt, duration, nowIso(), id, tenantId);
     if (row.status === 'em_andamento') {
+      const remaining = db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM sessions
+           WHERE tenant_id = ? AND cart_id = ?
+             AND status = 'em_andamento' AND excluida_em IS NULL`,
+        )
+        .get(tenantId, row.cart_id).n;
+      const nextStatus = remaining > 0 ? 'em_uso' : 'disponivel';
       db.prepare(
-        "UPDATE carts SET status = 'disponivel', atualizado_em = ? WHERE id = ? AND tenant_id = ?",
-      ).run(nowIso(), row.cart_id, tenantId);
-      logCartStatus(db, tenantId, row.cart_id, 'em_uso', 'disponivel', 'cancelamento', motivo, operator.id);
+        'UPDATE carts SET status = ?, atualizado_em = ? WHERE id = ? AND tenant_id = ?',
+      ).run(nextStatus, nowIso(), row.cart_id, tenantId);
+      logCartStatus(db, tenantId, row.cart_id, 'em_uso', nextStatus, 'cancelamento', motivo, operator.id);
     }
     logEvent(db, tenantId, id, 'cancelamento', operator.id, {
       motivo,

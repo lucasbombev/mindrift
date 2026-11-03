@@ -56,6 +56,7 @@ function statusClass(status) {
     {
       disponivel: 'available',
       em_uso: 'in-use',
+      lotado: 'full',
       carregando: 'charging',
       manutencao: 'maintenance',
     }[status] || 'available'
@@ -64,6 +65,15 @@ function statusClass(status) {
 
 export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd, onStatusChange, isAdmin }) {
   const session = cart.sessaoAtiva;
+  const capacity = Math.max(1, Number(cart.capacidadeMaxima) || 1);
+  const collective = capacity > 1;
+  const sessions = Array.isArray(cart.sessoesAtivas)
+    ? cart.sessoesAtivas
+    : session
+      ? [session]
+      : [];
+  const occupancy = Number(cart.ocupacaoAtual ?? sessions.length) || 0;
+  const collectiveOperational = collective && cart.status !== 'carregando' && cart.status !== 'manutencao';
   const openTimer = Boolean(session && !session.fimPrevistoEm);
   const endsAt = session && !openTimer ? new Date(session.fimPrevistoEm).getTime() : 0;
   const elapsed = session ? Math.max(0, now - new Date(session.iniciadoEm).getTime()) : 0;
@@ -121,15 +131,68 @@ export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd,
           <button
             type="button"
             className="cart-menu-btn"
-            aria-label={session ? 'Encerre a sessão primeiro' : `Alterar status de ${cart.codigo}`}
-            title={session ? 'Encerre a sessão primeiro' : 'Alterar status'}
-            disabled={Boolean(session) || cart.status === 'em_uso'}
+            aria-label={sessions.length ? 'Encerre as sessões primeiro' : `Alterar status de ${cart.codigo}`}
+            title={sessions.length ? 'Encerre as sessões primeiro' : 'Alterar status'}
+            disabled={sessions.length > 0 || cart.status === 'em_uso'}
             onClick={() => onStatusChange?.(cart)}
           >
             <Icon name="more" size={20} />
           </button>
         </div>
-        {session ? (
+        {collectiveOperational ? (
+          <>
+            <div className="cart-card__occupancy">
+              <div className="cart-card__occupancy-head">
+                <span>Ocupação</span>
+                <strong>{occupancy}/{capacity}</strong>
+              </div>
+              <div className="cart-card__occupancy-bar" aria-hidden="true">
+                <span style={{ width: `${Math.min(100, (occupancy / capacity) * 100)}%` }} />
+              </div>
+            </div>
+
+            {sessions.length > 0 ? (
+              <div className="cart-card__children">
+                {sessions.slice(0, 4).map((item) => (
+                  <span key={item.id} className="cart-card__child">
+                    <strong>{clientName(item.clienteNome)}</strong>
+                    <em>
+                      {item.fimPrevistoEm
+                        ? formatCountdown(new Date(item.fimPrevistoEm).getTime() - now).text
+                        : formatElapsed(now - new Date(item.iniciadoEm).getTime())}
+                    </em>
+                  </span>
+                ))}
+                {sessions.length > 4 && <span className="cart-card__child-more">+{sessions.length - 4}</span>}
+              </div>
+            ) : (
+              <div className="cart-card__ready">
+                <span className="cart-card__ready-icon"><Icon name="check" size={18} /></span>
+                <div>
+                  <strong>Pronto para receber</strong>
+                  <span>{capacity} vagas disponíveis</span>
+                </div>
+              </div>
+            )}
+
+            {occupancy >= capacity ? (
+              <Button size="lg" block icon="lock" disabled>
+                Equipamento lotado
+              </Button>
+            ) : (
+              <Button size="lg" block icon="plus" onClick={() => onStart(cart)}>
+                Adicionar Criança
+              </Button>
+            )}
+            <Link className="cart-card__manage" to="/em-uso">
+              Gerenciar sessões
+              <Icon name="chevronRight" size={16} />
+            </Link>
+            <p className="cart-card__status-note">
+              {occupancy ? 'Cada criança tem seu próprio timer e encerramento.' : 'Capacidade coletiva: várias entradas simultâneas.'}
+            </p>
+          </>
+        ) : session ? (
           <>
             <div className="cart-card__session-head">
               <Avatar name={clientName(session.clienteNome)} size={34} />
@@ -243,7 +306,7 @@ export function CartCard({ cart, now, alertLeadSeconds, onStart, onRenew, onEnd,
             )}
           </>
         )}
-        {cart.status === 'em_uso' && !session && (
+        {!collective && cart.status === 'em_uso' && !session && (
           <p className="cart-card__warning">
             <Icon name="alert" size={15} /> Status “em uso” sem sessão ativa. Ajuste no cadastro.
           </p>

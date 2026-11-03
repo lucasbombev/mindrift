@@ -407,6 +407,19 @@ servidor mostra `[push] teste manual ... enviados=... falhas=...`.
 6. No Docker, o `docker-compose.yml` carrega `backend/.env` via `env_file`; as chaves
    não precisam ficar no `.env` da raiz.
 
+## 7.4 Equipamentos coletivos
+
+- `carts.capacidade_maxima = 1` mantém o comportamento dos carrinhos de drift.
+- Valores maiores (ex.: 10) permitem várias sessões ativas simultâneas no mesmo equipamento.
+- Cada sessão tem seu próprio cliente, plano, timer e encerramento.
+- O status é derivado:
+  - **disponível**: nenhuma sessão ativa;
+  - **em uso**: 1..capacidade-1 sessões;
+  - **lotado**: capacidade atingida.
+- Em equipamentos coletivos, `cliente_nome` é obrigatório.
+- A aba **Em uso** agrupa o resumo de ocupação (`Pula-Pula: 3/10`) e lista uma linha por criança.
+- O push informa o nome e o equipamento da criança e abre `/em-uso?session=<id>`, destacando a sessão.
+
 ## 8. Perfis e permissões
 
 | Ação | Superadmin | Admin do tenant | Operador |
@@ -446,7 +459,7 @@ A migração é automática, transacional e idempotente. Ela detecta banco legad
 (`default`). O admin atual continua no tenant default; o superadmin é criado pelo seed.
 
 Detalhes e rollback: **[backend/migrations/MIGRACAO.md](backend/migrations/MIGRACAO.md)**.
-Schema de referência: **[001_multi_tenant.sql](backend/migrations/001_multi_tenant.sql)** (v3), **[002_superadmin_system_sounds.sql](backend/migrations/002_superadmin_system_sounds.sql)** (v4), **[003_timer_livre_push.sql](backend/migrations/003_timer_livre_push.sql)** (v5) e **[004_superadmin_password_audit.sql](backend/migrations/004_superadmin_password_audit.sql)** (v6), **[005_push_enabled.sql](backend/migrations/005_push_enabled.sql)** (v7).
+Schema de referência: **[001_multi_tenant.sql](backend/migrations/001_multi_tenant.sql)** (v3), **[002_superadmin_system_sounds.sql](backend/migrations/002_superadmin_system_sounds.sql)** (v4), **[003_timer_livre_push.sql](backend/migrations/003_timer_livre_push.sql)** (v5) e **[004_superadmin_password_audit.sql](backend/migrations/004_superadmin_password_audit.sql)** (v6), **[005_push_enabled.sql](backend/migrations/005_push_enabled.sql)** (v7) e **[006_capacidade_coletiva.sql](backend/migrations/006_capacidade_coletiva.sql)** (v8).
 
 ### Restauração manual
 
@@ -471,7 +484,7 @@ superadmin pode criar/baixar backups no menu **Sistema**; o admin do tenant não
 npm test
 ```
 
-**38 testes** cobrem autenticação/refresh, rate limit, adiantado, renovação, encerramento, caixa, isolamento entre
+**39 testes** cobrem autenticação/refresh, rate limit, adiantado, renovação, encerramento, caixa, isolamento entre
 tenants, signup público, suspensão/bloqueio, impersonação auditada, reset/transferência de admin,
 soft/hard delete, métricas, comunicado global, categorias, planos por categoria, QR/PDF, check-in,
 destino do carrinho, telefone, preferências de som, mudança de status com `CartStatusEvent`, timer livre, inscrição push e alteração de senha auditada do superadmin.
@@ -532,6 +545,14 @@ Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no cel
 - [ ] Card mostra manutenção; tentar iniciar aluguel deve falhar; histórico do modal mostra o evento.
 - [ ] Em carrinho em uso, o botão **⋮** está desabilitado com o aviso “Encerre a sessão primeiro”.
 - [ ] Voltar para disponível/carregando e conferir cada transição.
+
+**Equipamentos coletivos**
+- [ ] Cadastrar um equipamento com capacidade 10.
+- [ ] Iniciar João (15 min) e Maria (10 min) sem encerrar João.
+- [ ] Confirmar 2 cards independentes em **Em uso** e o resumo de ocupação.
+- [ ] Encerrar apenas João; Maria continua e o equipamento segue em uso.
+- [ ] Tentar adicionar além da capacidade; deve ser recusado.
+- [ ] Encerrar Maria; o equipamento volta para disponível.
 
 **Identidade, menu e timer livre**
 - [ ] Título/logo/manifest mostram **Mindrift**.

@@ -149,6 +149,7 @@ export function statusLabel(status) {
     {
       disponivel: 'Disponível',
       em_uso: 'Em uso',
+      lotado: 'Lotado',
       carregando: 'Carregando',
       manutencao: 'Manutenção',
       em_andamento: 'Em andamento',

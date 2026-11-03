@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useSocketEvent } from '../context/SocketContext.jsx';
@@ -18,7 +18,30 @@ export function ActiveSessionsPage() {
   const [serverOffset, setServerOffset] = useState(0);
   const [endSession, setEndSession] = useState(null);
   const [renewSession, setRenewSession] = useState(null);
+  const [searchParams] = useSearchParams();
+  const [highlight, setHighlight] = useState(null);
+  const targetSessionId = Number(searchParams.get('session')) || null;
   const now = useNow(500) + serverOffset;
+  const occupancySummary = useMemo(() => {
+    const groups = new Map();
+    for (const session of sessions) {
+      const capacity = Number(session.cartCapacidadeMaxima) || 1;
+      if (capacity <= 1) continue;
+      const key = session.cartId;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          cartId: key,
+          nome: session.cartCategoryNome || session.cartCodigo,
+          codigo: session.cartCodigo,
+          capacidade: capacity,
+        });
+      }
+    }
+    return [...groups.values()].map((group) => ({
+      ...group,
+      ocupados: sessions.filter((session) => session.cartId === group.cartId).length,
+    }));
+  }, [sessions]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -44,6 +67,15 @@ export function ActiveSessionsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    if (!targetSessionId || !sessions.some((session) => session.id === targetSessionId)) return undefined;
+    const node = document.getElementById(`session-${targetSessionId}`);
+    if (node) node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlight(targetSessionId);
+    const timer = setTimeout(() => setHighlight(null), 5000);
+    return () => clearTimeout(timer);
+  }, [targetSessionId, sessions]);
+
   useSocketEvent('session_started', applySocketSessions);
   useSocketEvent('session_ended', applySocketSessions);
   useSocketEvent('session_updated', applySocketSessions);
@@ -56,6 +88,17 @@ export function ActiveSessionsPage() {
         subtitle="Veículos com sessão ativa agora. Use Encerrar para fazer o check-in."
         eyebrow="Operação"
       />
+
+      {occupancySummary.length > 0 && (
+        <div className="active-occupancy-summary" aria-label="Ocupação dos equipamentos coletivos">
+          {occupancySummary.map((group) => (
+            <div key={group.cartId} className={`active-occupancy ${group.ocupados >= group.capacidade ? 'is-full' : ''}`}>
+              <span>{group.nome}</span>
+              <strong>{group.ocupados}/{group.capacidade} ocupados</strong>
+            </div>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="center-pad"><Spinner size={28} /></div>
@@ -76,7 +119,7 @@ export function ActiveSessionsPage() {
             const elapsed = now - new Date(session.iniciadoEm).getTime();
             const countdown = open ? { text: formatElapsed(elapsed), expired: false } : formatCountdown(remaining);
             return (
-              <article key={session.id} className={`active-session-card ${open ? 'is-open' : ''} ${countdown.expired ? 'is-expired' : ''}`}>
+              <article id={`session-${session.id}`} key={session.id} className={`active-session-card ${open ? 'is-open' : ''} ${countdown.expired ? 'is-expired' : ''} ${highlight === session.id ? 'is-highlighted' : ''}`}>
                 <div className="active-session-card__media">
                   {session.cartFotoUrl ? (
                     <img src={session.cartFotoUrl} alt={`Veículo ${session.cartCodigo}`} loading="lazy" />

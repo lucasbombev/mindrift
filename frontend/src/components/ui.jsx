@@ -187,6 +187,7 @@ export function StatusBadge({ status }) {
   const map = {
     disponivel: { tone: 'green', label: 'Disponível' },
     em_uso: { tone: 'blue', label: 'Em uso' },
+    lotado: { tone: 'red', label: 'Lotado' },
     carregando: { tone: 'amber', label: 'Carregando' },
     manutencao: { tone: 'gray', label: 'Manutenção' },
     em_andamento: { tone: 'blue', label: 'Em andamento' },

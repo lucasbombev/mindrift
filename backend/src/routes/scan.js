@@ -7,15 +7,18 @@ function scanResponse(db, tenantId, cart) {
   const active = db
     .prepare(
       `SELECT id FROM sessions WHERE tenant_id = ? AND cart_id = ?
-       AND status = 'em_andamento' AND excluida_em IS NULL`,
+       AND status = 'em_andamento' AND excluida_em IS NULL
+       ORDER BY iniciado_em ASC, id ASC`,
     )
-    .get(tenantId, cart.id);
+    .all(tenantId, cart.id);
   const tenant = db.prepare('SELECT nome, slug FROM tenants WHERE id = ?').get(tenantId);
+  const activeSessions = active.map((row) => getSessionById(db, tenantId, row.id));
   return {
     serverNow: new Date().toISOString(),
     tenant: { id: tenantId, nome: tenant?.nome || null, slug: tenant?.slug || null },
-    cart: serializeCart(cart),
-    activeSession: active ? getSessionById(db, tenantId, active.id) : null,
+    cart: serializeCart(cart, active.length),
+    activeSession: activeSessions[0] || null,
+    sessoesAtivas: activeSessions,
   };
 }
 
