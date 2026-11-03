@@ -349,16 +349,34 @@ apenas o indicador verde/vermelho **Sistema operacional**.
 - Tabela `push_subscriptions`: uma inscrição por dispositivo, vinculada a usuário e tenant.
 - Rotas: `GET /api/push/public-key`, `GET /api/push/status`, `POST /api/push/subscribe`,
   `DELETE /api/push/unsubscribe`, `POST /api/push/test`.
+- O loop de expiração roda no Node.js de forma independente do frontend (a cada 1 s; não depende de WebSocket nem de requisição do app).
 - Quando um timer **com fim previsto** chega a zero, o backend envia:
   `Tempo esgotado!` / `O aluguel do veículo [CÓDIGO] terminou.` / URL `/em-uso`.
 - O service worker gerado importa `push-sw.js` e trata `push` e `notificationclick`, abrindo/focando
   o PWA em `/em-uso`, toca o alarme local conforme a preferência do usuário e não duplica a notificação nativa.
+- O frontend **não** cria notificação nativa em paralelo; apenas o backend envia o Web Push. O Service Worker é o único responsável por `showNotification`.
+- Com a tela bloqueada, o sistema operacional toca o som padrão da notificação. Web Audio customizado não roda em segundo plano; ao abrir pela notificação, o app toca o alarme configurado.
 - Em **Ajustes → Alertas** e também em **Mais → Som e vibração**, o usuário liga/desliga push,
   envia notificação de teste e vê o estado da permissão.
 - No iOS, o PWA precisa estar **instalado na Tela de Início** para receber Web Push. O toggle só
   funciona em HTTPS confiável (Tailscale) ou localhost.
 - Se o usuário bloquear a permissão, o app mostra instruções para liberar nas configurações do
   navegador/PWA.
+
+### Teste de push com atraso de 10 segundos
+
+Com o app fechado/minimizado e uma inscrição ativa:
+
+```bash
+curl -X POST http://localhost:3000/api/push/test \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"delay_seconds":10}'
+```
+
+A resposta é **202** e a notificação é agendada no backend. Bloqueie a tela do celular durante os
+10 segundos; o push deve chegar pelo sistema operacional, sem depender do Socket.IO. O log do
+servidor mostra `[push] teste manual ... enviados=... falhas=...`.
 
 ### Se aparecer “Notificações push não estão configuradas no servidor”
 

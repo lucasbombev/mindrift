@@ -6552,3 +6552,9 @@ body:has(.bottom-nav) .pwa-update-banner {
   font-weight: 700;
   cursor: pointer;
 }
+
+.push-settings__tests {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

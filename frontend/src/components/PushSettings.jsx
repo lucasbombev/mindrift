@@ -84,12 +84,18 @@ export function PushSettings({ compact = false }) {
     }
   };
 
-  const sendTest = async () => {
+  const sendTest = async (delaySeconds = 0) => {
     setBusy(true);
     setMessage('');
     try {
-      await api.post('/push/test');
-      toast('Notificação de teste enviada. Ela deve aparecer mesmo com o app em segundo plano.', { type: 'success' });
+      const data = await api.post('/push/test', delaySeconds ? { delay_seconds: delaySeconds } : undefined);
+      toast(
+        delaySeconds
+          ? `Notificação agendada para daqui a ${delaySeconds}s. Bloqueie a tela agora.`
+          : 'Notificação de teste enviada. Ela deve aparecer mesmo com o app em segundo plano.',
+        { type: 'success' },
+      );
+      if (data?.agendado) setMessage(`Teste agendado no backend para ${delaySeconds}s.`);
     } catch (err) {
       setMessage(err.message);
     } finally {
@@ -127,9 +133,14 @@ export function PushSettings({ compact = false }) {
             />
           </div>
           {subscribed && (
-            <Button size="sm" variant="secondary" icon="bell" onClick={sendTest} loading={busy} block>
-              Enviar notificação de teste
-            </Button>
+            <div className="push-settings__tests">
+              <Button size="sm" variant="secondary" icon="bell" onClick={() => sendTest(0)} loading={busy} block>
+                Enviar notificação de teste
+              </Button>
+              <Button size="sm" variant="ghost" icon="clock" onClick={() => sendTest(10)} loading={busy} block>
+                Testar com tela bloqueada (10s)
+              </Button>
+            </div>
           )}
           {permission === 'denied' && (
             <InfoNote tone="warning" icon="alert">

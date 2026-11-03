@@ -16,6 +16,10 @@ const payloadSchema = z.object({
   subscription: subscriptionSchema,
 });
 
+const testSchema = z.object({
+  delay_seconds: z.coerce.number().int().min(0).max(30).optional().default(0),
+});
+
 const unsubscribeSchema = z.object({
   endpoint: z.string().url().max(1000).optional(),
   subscription: subscriptionSchema.optional(),
@@ -102,12 +106,40 @@ export function createPushRouter(db) {
   router.post('/test', async (req, res, next) => {
     try {
       if (!pushConfigured()) throw badRequest('Notificações push não estão configuradas no servidor. Verifique VAPID no backend/.env e reinicie com npm run vapid:generate.', 'push_indisponivel');
-      const result = await sendToUser(db, req.tenantId, req.user.id, {
-        title: 'Notificação de teste',
-        body: 'Se você está vendo isto, o Web Push do Mindrift está funcionando.',
-        url: '/em-uso',
-        som: '/sounds/alarme.wav',
-      });
+      const body = testSchema.parse(req.body || {});
+      const inscricoes = db
+        .prepare('SELECT COUNT(*) AS n FROM push_subscriptions WHERE tenant_id = ? AND user_id = ?')
+        .get(req.tenantId, req.user.id).n;
+      if (inscricoes === 0) {
+        throw badRequest('Nenhuma inscrição ativa. Ative as notificações push primeiro.', 'sem_inscricao');
+      }
+      const send = async () => {
+        const result = await sendToUser(db, req.tenantId, req.user.id, {
+          title: 'Tempo esgotado!',
+          body: 'Teste de notificação do Mindrift: o aluguel do veículo de teste terminou.',
+          url: '/em-uso',
+          som: '/sounds/alarme.wav',
+          tag: 'mindrift-test-push',
+        });
+        console.log(
+          `[push] teste manual usuário=${req.user.id}: enviados=${result.sent} falhas=${result.failed}`,
+        );
+        return result;
+      };
+
+      if (body.delay_seconds > 0) {
+        setTimeout(() => {
+          send().catch((err) => console.error('[push] teste atrasado falhou:', err.message));
+        }, body.delay_seconds * 1000);
+        return res.status(202).json({
+          ok: true,
+          agendado: true,
+          delaySeconds: body.delay_seconds,
+          mensagem: `Notificação de teste agendada para daqui a ${body.delay_seconds}s.`,
+        });
+      }
+
+      const result = await send();
       if (result.sent === 0) {
         throw badRequest('Nenhuma inscrição ativa. Ative as notificações push primeiro.', 'sem_inscricao');
       }

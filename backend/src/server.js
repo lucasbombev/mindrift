@@ -172,12 +172,20 @@ const expireCheck = setInterval(() => {
       const somValido = ['beep', 'sino', 'alarme', 'bipe-duplo', 'apito', 'campainha'].includes(somFim)
         ? somFim
         : 'alarme';
-      void sendToTenant(db, session.tenant_id, {
+      const pushPayload = {
         title: 'Tempo esgotado!',
         body: `O aluguel do veículo ${session.cart_codigo} terminou.`,
         url: '/em-uso',
         som: `/sounds/${somValido}.wav`,
-      });
+        tag: `mindrift-expired-${session.id}-${session.fim_previsto_em}`,
+      };
+      void sendToTenant(db, session.tenant_id, pushPayload)
+        .then((result) => {
+          console.log(
+            `[push] timer ${session.id}/${session.cart_codigo}: enviados=${result.sent} falhas=${result.failed}`,
+          );
+        })
+        .catch((err) => console.error('[push] falha no envio do timer:', err.message));
     } else if (remaining > 0 && remaining <= leadSeconds * 1000 && !notified.has(leadKey)) {
       notified.add(leadKey);
       io.to(`tenant:${session.tenant_id}`).emit('session:expiring', {
@@ -224,6 +232,7 @@ httpServer.listen(port, config.host, () => {
   const urls = getLanUrls(port);
   console.log('');
   pushConfigured();
+  console.log('[timer] verificação de timers/Web Push ativa a cada 1s (independente do frontend).');
   console.log('  🏁 Mindrift — servidor no ar');
   console.log(`  Local:   http://localhost:${port}`);
   for (const url of urls) console.log(`  Rede:    ${url}`);

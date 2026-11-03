@@ -83,7 +83,7 @@ function subscriptionsFor(db, { tenantId, userId }) {
       .prepare(
         `SELECT ps.* FROM push_subscriptions ps
          JOIN users u ON u.id = ps.user_id
-         WHERE ps.user_id = ? AND u.ativo = 1 AND u.push_enabled = 1 AND u.tenant_id = ?`,
+         WHERE ps.user_id = ? AND u.ativo = 1 AND u.tenant_id = ?`,
       )
       .all(userId, tenantId);
   }
@@ -92,7 +92,7 @@ function subscriptionsFor(db, { tenantId, userId }) {
       `SELECT ps.* FROM push_subscriptions ps
        JOIN users u ON u.id = ps.user_id
        JOIN tenants t ON t.id = ps.tenant_id
-       WHERE ps.tenant_id = ? AND u.ativo = 1 AND u.push_enabled = 1
+       WHERE ps.tenant_id = ? AND u.ativo = 1
          AND t.ativo = 1 AND t.excluido_em IS NULL`,
     )
     .all(tenantId);
