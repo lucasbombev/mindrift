@@ -265,15 +265,17 @@ export function StartSessionModal({ open, onClose, carts, preselectedCart, onSuc
         </Field>
 
         <Field
-          label={collective ? 'Nome da criança (opcional)' : 'Nome do cliente (opcional)'}
+          label={collective ? 'Nome da criança (opcional)' : 'Nome do cliente (opcional, padrão: ID do brinquedo)'}
           htmlFor="cliente"
-          hint={collective ? 'Se deixar em branco, o sistema atribui Criança 1, Criança 2... automaticamente.' : 'Pode iniciar sem nome e preencher depois no histórico.'}
+          hint={collective
+            ? 'Se deixar em branco, o sistema atribui Criança 1, Criança 2... automaticamente.'
+            : `Se deixar em branco, será usado o código ${selectedCart?.codigo || 'do brinquedo'} como nome.`}
         >
           <Input
             id="cliente"
             value={cliente}
             onChange={(event) => setCliente(event.target.value)}
-            placeholder={collective ? 'Ex.: João (ou deixe em branco)' : 'Ex.: João (ou deixe em branco)'}
+            placeholder={collective ? 'Ex.: João (ou deixe em branco)' : `Ex.: João (ou deixe em branco: ${selectedCart?.codigo || 'D01'})`}
             maxLength={80}
             autoComplete="off"
             disabled={loading}

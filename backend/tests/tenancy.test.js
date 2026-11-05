@@ -269,7 +269,7 @@ test('scan por QR/código respeita tenant; PDF; check-in e destino', async () =>
   assert.equal(list.body.items.find((c) => c.id === cartA.id).status, 'carregando');
 });
 
-test('cliente opcional, edição posterior e relatório sem identificação', async () => {
+test('cliente sem nome usa o código do brinquedo e pode ser editado depois', async () => {
   const cart = (await api.get('/api/carts').set(auth(tokenA))).body.items.find(
     (c) => c.status === 'disponivel',
   );
@@ -280,11 +280,11 @@ test('cliente opcional, edição posterior e relatório sem identificação', as
     .send({ cart_id: cart.id, plano_id: plansA[0].id, cliente_nome: null });
   assert.equal(started.status, 201, JSON.stringify(started.body));
   const session = started.body.sessao;
-  assert.equal(session.clienteNome, null);
+  assert.equal(session.clienteNome, cart.codigo);
 
   const dashboard = await api.get('/api/dashboard').set(auth(tokenA));
   assert.equal(dashboard.status, 200);
-  assert.equal(dashboard.body.carts.find((c) => c.id === cart.id).sessaoAtiva.clienteNome, null);
+  assert.equal(dashboard.body.carts.find((c) => c.id === cart.id).sessaoAtiva.clienteNome, cart.codigo);
 
   const paidNow = await api
     .post(`/api/sessions/${session.id}/pay-active`)
@@ -322,7 +322,7 @@ test('cliente opcional, edição posterior e relatório sem identificação', as
   const report = await api.get('/api/reports/summary').set(auth(tokenA));
   assert.equal(report.status, 200);
   assert.ok(
-    report.body.devedores.some((debtor) => debtor.clienteNome === 'Sem identificação'),
-    'relatório deve agrupar cliente nulo como Sem identificação',
+    report.body.devedores.some((debtor) => debtor.clienteNome === cart.codigo),
+    'relatório deve identificar o aluguel sem nome pelo código do brinquedo',
   );
 });

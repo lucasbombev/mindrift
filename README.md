@@ -13,7 +13,7 @@ sessões, caixa e configurações. Um administrador **nunca** acessa dados de ou
 - **Categorias** por negócio (Drift, Kart, Patinete, Quadriciclo + novas categorias).
 - **QR Code** por brinquedo com impressão de etiquetas 5 × 5 cm, PDF A4 e leitura pela câmera.
 - **Check-in/check-out visual**: encerrar escolhendo o destino do equipamento em 1 toque.
-- **Cliente opcional**, editável depois, com relatórios agrupando “Sem identificação”.
+- **Cliente opcional**: em brinquedos individuais, o código do brinquedo vira o nome padrão; em coletivos, o sistema gera Criança 1, Criança 2 etc.
 - **Superadmin completo**: ciclo de vida de tenants, métricas, impersonação auditada, reset/transferência de admin, comunicado global e painel **Sistema**.
 - **Telefone** do usuário com máscara brasileira e E.164.
 - **Som configurável** por tenant e por usuário (6 sons locais, volume, vibração e repetição).
@@ -305,12 +305,14 @@ iOS sem app nativo.
 
 ## 7. Cliente opcional
 
-- Campo **“Nome do cliente (opcional)”** no início.
-- Iniciar com o campo vazio funciona normalmente.
-- Histórico e cards mostram **Cliente não informado** (nunca “null”).
+- Em brinquedos individuais (capacidade 1), o campo é **“Nome do cliente (opcional, padrão: ID do brinquedo)”**.
+- Se ficar vazio, o backend salva o **código do brinquedo** como nome (ex.: `D01`, `P01`), permitindo
+  consultar pelo Portal do Cliente usando esse código.
+- Em equipamentos coletivos, se ficar vazio o backend atribui **Criança 1**, **Criança 2** etc.
+- Nomes digitados pelo operador são sempre preservados.
 - **Editar nome do cliente** disponível para admin e operador no menu de ações do histórico e na
   tela do scan. A alteração gera um `SessionEvent` do tipo `edicao_cliente`.
-- Relatórios agrupam sessões sem nome como **Sem identificação**.
+- Registros antigos sem nome continuam aparecendo como **Sem identificação** nos relatórios.
 
 ---
 
@@ -542,7 +544,7 @@ Antes de começar: `npm start`, `tailscale serve --bg 3000`, abra o HTTPS no cel
 **Cliente opcional**
 - [ ] Iniciar sem nome; card/histórico mostram “Cliente não informado”.
 - [ ] Editar o nome no histórico; conferir a alteração e o evento de auditoria.
-- [ ] Relatório de pendências mostra “Sem identificação” para o cliente nulo.
+- [ ] Iniciar um brinquedo individual sem nome e confirmar que o nome exibido é o código; consultar esse código no Portal do Cliente.
 
 **Superadmin / Sistema**
 - [ ] Suspender um tenant; admin e operador recebem **403** com mensagem de negócio suspenso.

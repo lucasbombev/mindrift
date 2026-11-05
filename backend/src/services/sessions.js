@@ -181,8 +181,8 @@ export function startSession(db, tenantId, input, operator) {
       );
     }
     let cliente = normalizeClientName(input.cliente_nome);
-    if (capacity > 1 && !cliente) {
-      cliente = nextChildLabel(db, tenantId, cart.id);
+    if (!cliente) {
+      cliente = capacity > 1 ? nextChildLabel(db, tenantId, cart.id) : cart.codigo;
     }
 
     const pricing = resolvePricing(db, tenantId, input, cart.category_id);
