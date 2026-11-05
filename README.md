@@ -355,7 +355,8 @@ apenas o indicador verde/vermelho **Sistema operacional**.
   `DELETE /api/push/unsubscribe`, `POST /api/push/test`.
 - O loop de expiração roda no Node.js de forma independente do frontend (a cada 1 s; não depende de WebSocket nem de requisição do app).
 - Quando um timer **com fim previsto** chega a zero, o backend envia:
-  `Tempo esgotado!` / `O aluguel do veículo [CÓDIGO] terminou.` / URL `/em-uso`.
+  `Tempo Esgotado!` / `O tempo no brinquedo [NOME] acabou.` / URL `/em-uso`.
+- O payload é intencionalmente enxuto (somente `title`, `body` e `url`), bem abaixo do limite de 4 KB.
 - O service worker gerado importa `push-sw.js` e trata `push` e `notificationclick`, abrindo/focando
   o PWA em `/em-uso`, toca o alarme local conforme a preferência do usuário e não duplica a notificação nativa.
 - O frontend **não** cria notificação nativa em paralelo; apenas o backend envia o Web Push. O Service Worker é o único responsável por `showNotification`.
@@ -373,7 +374,8 @@ O envio depende de uma inscrição real em `push_subscriptions`. Se não houver 
 o backend registra:
 
 ```text
-[push] tenant 1 sem inscrições push ativas.
+[push] tenant 1: inscrições encontradas=0
+[push] nenhuma inscrição encontrada (tenant=1).
 [push] timer 4/D01: enviados=0 falhas=0
 ```
 
@@ -392,6 +394,14 @@ Se o contador estiver em `0`:
 
 O app também re-sincroniza automaticamente uma inscrição que já exista no
 navegador, mesmo que `push_enabled` esteja `0` após uma restauração de banco.
+
+O backend agora registra, para cada envio:
+
+- quantidade de inscrições encontradas;
+- usuário, tenant e host do endpoint;
+- tamanho do payload;
+- status HTTP de sucesso/falha;
+- remoção automática de inscrições com status **403, 404 ou 410**.
 Se a permissão estiver bloqueada, libere nas configurações do Chrome/Safari;
 no iPhone, instale o PWA na Tela de Início.
 
@@ -450,7 +460,7 @@ servidor mostra `[push] teste manual ... enviados=... falhas=...`.
   - **lotado**: capacidade atingida.
 - Em equipamentos coletivos, `cliente_nome` é opcional. Se ficar em branco, o backend atribui automaticamente **Criança 1**, **Criança 2** etc., sem repetir números entre sessões ativas do mesmo brinquedo.
 - A aba **Em uso** agrupa o resumo de ocupação (`Pula-Pula: 3/10`) e lista uma linha por criança.
-- O push informa o nome e o equipamento da criança e abre `/em-uso?session=<id>`, destacando a sessão.
+- O push é enxuto e abre diretamente em `/em-uso`; o alarme local é tocado conforme a preferência ao abrir o app.
 
 ## 7.5 Portal do Cliente (QR Code global)
 
@@ -535,7 +545,7 @@ superadmin pode criar/baixar backups no menu **Sistema**; o admin do tenant não
 npm test
 ```
 
-**40 testes** cobrem autenticação/refresh, rate limit, adiantado, renovação, encerramento, caixa, isolamento entre
+**42 testes** cobrem autenticação/refresh, rate limit, adiantado, renovação, encerramento, caixa, isolamento entre
 tenants, signup público, suspensão/bloqueio, impersonação auditada, reset/transferência de admin,
 soft/hard delete, métricas, comunicado global, categorias, planos por categoria, QR/PDF, check-in,
 destino do brinquedo, telefone, preferências de som, mudança de status com `CartStatusEvent`, timer livre, inscrição push, portal público seguro e alteração de senha auditada do superadmin.

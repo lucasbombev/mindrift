@@ -1,4 +1,4 @@
-/* Web Push do Mindrift — importado pelo service worker gerado pelo vite-plugin-pwa. */
+/* Web Push do Leao Brinquedos — importado pelo service worker gerado pelo vite-plugin-pwa. */
 self.addEventListener('push', (event) => {
   let data = {};
   try {
@@ -6,13 +6,13 @@ self.addEventListener('push', (event) => {
   } catch {
     data = {};
   }
-  const title = data.title || 'Mindrift';
+  const title = data.title || 'Leao Brinquedos';
   const sound = data.som || '/sounds/alarme.wav';
   const options = {
     body: data.body || 'Há uma atualização no seu aluguel.',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
-    tag: data.tag || 'mindrift-timer',
+    tag: data.tag || 'leao-timer',
     renotify: true,
     silent: false,
     sound,

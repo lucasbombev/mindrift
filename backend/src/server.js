@@ -170,16 +170,10 @@ const expireCheck = setInterval(() => {
         fimPrevistoEm: session.fim_previsto_em,
         serverNow: now,
       });
-      const somFim = getSetting(db, session.tenant_id, 'som_fim', 'alarme');
-      const somValido = ['beep', 'sino', 'alarme', 'bipe-duplo', 'apito', 'campainha'].includes(somFim)
-        ? somFim
-        : 'alarme';
       const pushPayload = {
-        title: 'Tempo esgotado!',
-        body: `O tempo de ${session.cliente_nome || 'cliente'} no ${session.cart_category_nome || session.cart_codigo} acabou!`,
-        url: `/em-uso?session=${session.id}`,
-        som: `/sounds/${somValido}.wav`,
-        tag: `mindrift-expired-${session.id}-${session.fim_previsto_em}`,
+        title: 'Tempo Esgotado!',
+        body: `O tempo no brinquedo ${session.cart_category_nome || session.cart_codigo} acabou.`,
+        url: '/em-uso',
       };
       void sendToTenant(db, session.tenant_id, pushPayload)
         .then((result) => {

@@ -81,7 +81,8 @@ function subscriptionsFor(db, { tenantId, userId }) {
   if (userId) {
     return db
       .prepare(
-        `SELECT ps.* FROM push_subscriptions ps
+        `SELECT ps.*, u.username AS user_username, u.nome AS user_nome
+         FROM push_subscriptions ps
          JOIN users u ON u.id = ps.user_id
          WHERE ps.user_id = ? AND u.ativo = 1 AND u.tenant_id = ?`,
       )
@@ -89,7 +90,8 @@ function subscriptionsFor(db, { tenantId, userId }) {
   }
   return db
     .prepare(
-      `SELECT ps.* FROM push_subscriptions ps
+      `SELECT ps.*, u.username AS user_username, u.nome AS user_nome
+       FROM push_subscriptions ps
        JOIN users u ON u.id = ps.user_id
        JOIN tenants t ON t.id = ps.tenant_id
        WHERE ps.tenant_id = ? AND u.ativo = 1
@@ -98,47 +100,93 @@ function subscriptionsFor(db, { tenantId, userId }) {
     .all(tenantId);
 }
 
-async function sendRows(db, rows, payload) {
-  if (!rows.length || !configure()) return { sent: 0, failed: 0 };
+function endpointLabel(endpoint) {
+  try {
+    return new URL(endpoint).host || 'endpoint-sem-host';
+  } catch {
+    return 'endpoint-invalido';
+  }
+}
+
+function short(value, max = 240) {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+async function sendRows(db, rows, payload, context = {}) {
+  if (!configure()) {
+    console.error('[push] envio cancelado: VAPID não configurado.');
+    return { sent: 0, failed: 0, skipped: true };
+  }
+  if (!rows.length) {
+    console.warn(
+      `[push] nenhuma inscrição encontrada (${context.scope || 'tenant'}=${context.scopeId ?? '?'}).`,
+    );
+    return { sent: 0, failed: 0, skipped: true };
+  }
+
+  const serialized = JSON.stringify(payload);
+  const payloadBytes = Buffer.byteLength(serialized, 'utf8');
+  if (payloadBytes > 4096) {
+    console.error(`[push] payload acima do limite: ${payloadBytes} bytes.`);
+  }
+  console.log(
+    `[push] envio iniciado: inscrições=${rows.length} payload=${payloadBytes}B ` +
+      `escopo=${context.scope || 'tenant'} id=${context.scopeId ?? '?'}`,
+  );
+
   let sent = 0;
   let failed = 0;
   await Promise.all(
     rows.map(async (row) => {
+      const userLabel = `${row.user_id}${row.user_username ? `/${row.user_username}` : ''}`;
+      const endpoint = endpointLabel(row.endpoint);
+      console.log(`[push] tentando usuário=${userLabel} tenant=${row.tenant_id} endpoint=${endpoint}`);
       try {
-        await webpush.sendNotification(
+        const response = await webpush.sendNotification(
           {
             endpoint: row.endpoint,
             keys: { p256dh: row.p256dh, auth: row.auth },
           },
-          JSON.stringify(payload),
+          serialized,
           { TTL: 3600, urgency: 'high' },
         );
         sent += 1;
+        console.log(
+          `[push] enviado usuário=${userLabel} tenant=${row.tenant_id} endpoint=${endpoint} ` +
+            `status=${response?.statusCode || 201}`,
+        );
       } catch (err) {
         failed += 1;
-        if (err?.statusCode === 404 || err?.statusCode === 410) {
+        const statusCode = Number(err?.statusCode) || 0;
+        console.error(
+          `[push] falha usuário=${userLabel} tenant=${row.tenant_id} endpoint=${endpoint} ` +
+            `status=${statusCode || 'sem-status'} erro=${short(err?.message || err?.body || err)}`,
+        );
+        if ([403, 404, 410].includes(statusCode)) {
           db.prepare('DELETE FROM push_subscriptions WHERE id = ?').run(row.id);
-        } else {
-          console.warn('[push] falha ao enviar:', err?.statusCode || err?.message);
+          console.warn(
+            `[push] inscrição removida (status ${statusCode}): usuário=${userLabel} endpoint=${endpoint}`,
+          );
         }
       }
     }),
+  );
+  console.log(
+    `[push] resumo: enviados=${sent} falhas=${failed} inscrições=${rows.length} ` +
+      `escopo=${context.scope || 'tenant'} id=${context.scopeId ?? '?'}`,
   );
   return { sent, failed };
 }
 
 export function sendToUser(db, tenantId, userId, payload) {
   const rows = subscriptionsFor(db, { tenantId, userId });
-  if (!rows.length) {
-    console.warn(`[push] usuário ${userId} do tenant ${tenantId} sem inscrição ativa.`);
-  }
-  return sendRows(db, rows, payload);
+  console.log(`[push] usuário ${userId}: inscrições encontradas=${rows.length}`);
+  return sendRows(db, rows, payload, { scope: 'user', scopeId: userId });
 }
 
 export function sendToTenant(db, tenantId, payload) {
   const rows = subscriptionsFor(db, { tenantId });
-  if (!rows.length) {
-    console.warn(`[push] tenant ${tenantId} sem inscrições push ativas.`);
-  }
-  return sendRows(db, rows, payload);
+  console.log(`[push] tenant ${tenantId}: inscrições encontradas=${rows.length}`);
+  return sendRows(db, rows, payload, { scope: 'tenant', scopeId: tenantId });
 }
