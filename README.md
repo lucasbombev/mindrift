@@ -367,6 +367,34 @@ apenas o indicador verde/vermelho **Sistema operacional**.
 - Se o usuário bloquear a permissão, o app mostra instruções para liberar nas configurações do
   navegador/PWA.
 
+### Diagnóstico: “push não chega”
+
+O envio depende de uma inscrição real em `push_subscriptions`. Se não houver nenhuma,
+o backend registra:
+
+```text
+[push] tenant 1 sem inscrições push ativas.
+[push] timer 4/D01: enviados=0 falhas=0
+```
+
+Verifique:
+
+```sql
+SELECT COUNT(*) FROM push_subscriptions;
+```
+
+Se o contador estiver em `0`:
+
+1. abra o PWA e vá em **Ajustes → Alertas** ou **Mais → Som e vibração**;
+2. ative **Notificações push**;
+3. permita no navegador;
+4. toque em **Enviar notificação de teste**.
+
+O app também re-sincroniza automaticamente uma inscrição que já exista no
+navegador, mesmo que `push_enabled` esteja `0` após uma restauração de banco.
+Se a permissão estiver bloqueada, libere nas configurações do Chrome/Safari;
+no iPhone, instale o PWA na Tela de Início.
+
 ### Teste de push com atraso de 10 segundos
 
 Com o app fechado/minimizado e uma inscrição ativa:

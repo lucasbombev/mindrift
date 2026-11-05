@@ -31,21 +31,27 @@ export function PushPrompt() {
     let alive = true;
     const run = async () => {
       if (!user || user.role === 'superadmin' || user.mustChangePassword) return;
+      const iosNeedsInstall = isIos() && !isStandalonePwa();
+      if (!pushSupported() && !iosNeedsInstall) return;
+
+      // Mesmo que push_enabled esteja 0, uma inscrição que já existe no
+      // navegador deve ser re-sincronizada. Isso recupera o backend após uma
+      // restauração de banco/atualização do PWA sem exigir novo toggle.
+      const existing = await getCurrentSubscription();
+      if (!alive) return;
+      if (existing) {
+        await syncSubscription(existing).catch(() => {});
+        if (user.pushEnabled === false) await refreshUser();
+        return;
+      }
+
       if (user.pushEnabled === false) return;
       const permission = typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
       if (permission === 'denied') return;
       try {
         if (localStorage.getItem(`mindrift.push.prompt.dismissed.${user.id}`) === '1') return;
       } catch { /* noop */ }
-      const iosNeedsInstall = isIos() && !isStandalonePwa();
-      if (!pushSupported() && !iosNeedsInstall) return;
 
-      const existing = await getCurrentSubscription();
-      if (!alive) return;
-      if (existing) {
-        await syncSubscription(existing).catch(() => {});
-        return;
-      }
       if (permission === 'granted') {
         try {
           await subscribeCurrentDevice();

@@ -128,9 +128,17 @@ async function sendRows(db, rows, payload) {
 }
 
 export function sendToUser(db, tenantId, userId, payload) {
-  return sendRows(db, subscriptionsFor(db, { tenantId, userId }), payload);
+  const rows = subscriptionsFor(db, { tenantId, userId });
+  if (!rows.length) {
+    console.warn(`[push] usuário ${userId} do tenant ${tenantId} sem inscrição ativa.`);
+  }
+  return sendRows(db, rows, payload);
 }
 
 export function sendToTenant(db, tenantId, payload) {
-  return sendRows(db, subscriptionsFor(db, { tenantId }), payload);
+  const rows = subscriptionsFor(db, { tenantId });
+  if (!rows.length) {
+    console.warn(`[push] tenant ${tenantId} sem inscrições push ativas.`);
+  }
+  return sendRows(db, rows, payload);
 }
